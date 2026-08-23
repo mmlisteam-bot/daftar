@@ -6,7 +6,7 @@
 
 ## سایت زنده
 
-**[https://mmlisteam-bot.github.io/daftar/](https://mmlisteam-bot.github.io/daftar/)**
+**[https://mmlisteam-bot.github.io/](https://mmlisteam-bot.github.io/)**
 
 نوت‌ها روی همان مرورگری که باز می‌کنی می‌مانند.
 
