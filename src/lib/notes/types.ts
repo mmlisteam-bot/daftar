@@ -14,7 +14,14 @@ export type BlockType =
   | "toggle"
   | "table";
 
-export type CalloutKind = "info" | "warning" | "tip";
+export type CalloutKind =
+  | "info"
+  | "warning"
+  | "tip"
+  | "abstract"
+  | "note"
+  | "danger"
+  | "example";
 
 export type Block = {
   id: string;
@@ -71,7 +78,7 @@ export function nid(): string {
 export function emptyBlock(type: BlockType = "p"): Block {
   const block: Block = { id: nid(), type, content: "" };
   if (type === "todo") block.checked = false;
-  if (type === "code") block.lang = "http";
+  if (type === "code") block.lang = "text";
   if (type === "callout") block.callout = "info";
   if (type === "toggle") {
     block.open = true;

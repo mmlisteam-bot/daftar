@@ -1,6 +1,7 @@
 import {
   Download,
   FileJson,
+  FileText,
   Menu,
   Moon,
   Printer,
@@ -26,6 +27,7 @@ export function AppShell() {
   const order = useNotes((s) => s.order);
   const expanded = useNotes((s) => s.expanded);
   const importSnapshot = useNotes((s) => s.importSnapshot);
+  const importMarkdown = useNotes((s) => s.importMarkdown);
   const resetDemo = useNotes((s) => s.resetDemo);
   const [search, setSearch] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -73,11 +75,17 @@ export function AppShell() {
   function onImport(file: File) {
     const reader = new FileReader();
     reader.onload = () => {
+      const raw = String(reader.result);
+      if (/\.(md|markdown|txt)$/i.test(file.name) || (!file.name.endsWith(".json") && !raw.trim().startsWith("{"))) {
+        if (page) importMarkdown(page.id, raw);
+        return;
+      }
       try {
-        const data = JSON.parse(String(reader.result)) as NotesSnapshot;
+        const data = JSON.parse(raw) as NotesSnapshot;
         importSnapshot(data);
       } catch {
-        alert("فایل پشتیبان معتبر نیست.");
+        if (page) importMarkdown(page.id, raw);
+        else alert("فایل پشتیبان معتبر نیست.");
       }
     };
     reader.readAsText(file);
@@ -171,11 +179,27 @@ export function AppShell() {
                   پشتیبان JSON
                 </button>
                 <label className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[13px] hover:bg-surface-2">
+                  <FileText className="size-3.5" />
+                  ورود Markdown
+                  <input
+                    type="file"
+                    accept=".md,.markdown,.txt,text/markdown,text/plain"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f && page) {
+                        void f.text().then((md) => importMarkdown(page.id, md));
+                      }
+                      setMenu(false);
+                    }}
+                  />
+                </label>
+                <label className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[13px] hover:bg-surface-2">
                   <Upload className="size-3.5" />
                   بازیابی پشتیبان
                   <input
                     type="file"
-                    accept="application/json"
+                    accept="application/json,.md,.markdown,.txt"
                     className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0];

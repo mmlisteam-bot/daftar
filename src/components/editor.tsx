@@ -16,7 +16,10 @@ import {
 } from "react";
 import { PageGlyph, PAGE_ICON_KEYS } from "@/components/page-icon";
 import { Button } from "@/components/ui/button";
+import { HighlightedCode } from "@/lib/notes/highlight";
+import { headingAnchor, InlineMd } from "@/lib/notes/inline";
 import { compressImageFile, deleteImageBlob, getImageBlob, saveImageBlob } from "@/lib/notes/images";
+import { clipboardToBlocks, CODE_LANGS, normalizeLang } from "@/lib/notes/parse";
 import { breadcrumbs, getChildren, useNotes } from "@/lib/notes/store";
 import {
   emptyBlock,
@@ -38,6 +41,7 @@ const SLASH: { type: BlockType; label: string; hint: string; callout?: CalloutKi
   { type: "todo", label: "تودو", hint: "[]" },
   { type: "code", label: "کد", hint: "```" },
   { type: "quote", label: "نقل‌قول", hint: ">" },
+  { type: "callout", label: "خلاصه", hint: "abstract", callout: "abstract" },
   { type: "callout", label: "نکته", hint: "info", callout: "info" },
   { type: "callout", label: "هشدار", hint: "warning", callout: "warning" },
   { type: "callout", label: "تیپ", hint: "tip", callout: "tip" },
@@ -46,6 +50,16 @@ const SLASH: { type: BlockType; label: string; hint: string; callout?: CalloutKi
   { type: "toggle", label: "تاگل", hint: "toggle" },
   { type: "divider", label: "خط جداکننده", hint: "---" },
 ];
+
+const CALLOUT_LABEL: Record<CalloutKind, string> = {
+  abstract: "خلاصه",
+  info: "نکته",
+  note: "یادداشت",
+  tip: "تیپ",
+  warning: "هشدار",
+  danger: "خطر",
+  example: "مثال",
+};
 
 function applyMarkdownShortcut(text: string): Partial<Block> | null {
   if (text === "# " || text === "#") return { type: "h1", content: "" };
@@ -60,39 +74,125 @@ function applyMarkdownShortcut(text: string): Partial<Block> | null {
   return null;
 }
 
-function Editable({
+function jumpWiki(pageId: string, target: string) {
+  const page = useNotes.getState().pages[pageId];
+  if (!page) return;
+  const needle = headingAnchor(target);
+  const hit = page.blocks.find(
+    (b) =>
+      (b.type === "h1" || b.type === "h2" || b.type === "h3") &&
+      headingAnchor(b.content).includes(needle),
+  );
+  if (!hit) return;
+  document.querySelector(`[data-block="${hit.id}"]`)?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}
+
+async function pasteInto(
+  e: ClipboardEvent,
+  pageId: string,
+  block: Block,
+  opts?: { allowStructured?: boolean },
+) {
+  const file = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"))?.getAsFile();
+  if (file) {
+    e.preventDefault();
+    const blob = await compressImageFile(file);
+    const id = nid();
+    await saveImageBlob(id, blob);
+    const next = emptyBlock("image");
+    next.imageId = id;
+    useNotes.getState().replaceBlock(pageId, block.id, { ...next, id: block.id });
+    return;
+  }
+  if (opts?.allowStructured === false) return;
+  const incoming = clipboardToBlocks(e.clipboardData);
+  if (!incoming) return;
+  e.preventDefault();
+  const empty =
+    !block.content.trim() && block.type !== "table" && block.type !== "image" && block.type !== "divider";
+  const store = useNotes.getState();
+  if (empty) store.replaceWithBlocks(pageId, block.id, incoming);
+  else store.insertBlocks(pageId, block.id, incoming);
+  const page = store.pages[pageId];
+  if (
+    page &&
+    /^(صفحه جدید|بدون عنوان)$/.test(page.title) &&
+    incoming[0]?.type === "h1" &&
+    incoming[0].content.trim()
+  ) {
+    store.updatePage(pageId, { title: incoming[0].content.trim() });
+  }
+}
+
+function RichText({
   value,
   placeholder,
   className,
-  dir,
   onChange,
   onKeyDown,
   onPaste,
+  forceEdit,
 }: {
   value: string;
   placeholder?: string;
   className?: string;
-  dir?: "rtl" | "ltr";
   onChange: (v: string) => void;
   onKeyDown?: (e: ReactKeyboardEvent<HTMLTextAreaElement>) => void;
   onPaste?: (e: ClipboardEvent<HTMLTextAreaElement>) => void;
+  forceEdit?: boolean;
 }) {
+  const [editing, setEditing] = useState(value.trim() === "" || value.startsWith("/"));
   const ref = useRef<HTMLTextAreaElement>(null);
+  const showEdit = forceEdit || editing || value.trim() === "" || value.startsWith("/");
+
+  useEffect(() => {
+    if (showEdit) ref.current?.focus();
+  }, [showEdit]);
+
+  if (showEdit) {
+    return (
+      <textarea
+        ref={ref}
+        value={value}
+        rows={1}
+        dir="auto"
+        placeholder={placeholder}
+        className={cn(
+          "block-edit w-full resize-none border-0 bg-transparent p-0 leading-inherit outline-none",
+          className,
+        )}
+        onChange={(e) => onChange(e.target.value.replace(/\u00a0/g, " "))}
+        onKeyDown={onKeyDown}
+        onPaste={onPaste}
+        onBlur={() => {
+          if (value.trim() && !value.startsWith("/")) setEditing(false);
+        }}
+      />
+    );
+  }
+
   return (
-    <textarea
-      ref={ref}
-      value={value}
-      rows={1}
-      dir={dir}
-      placeholder={placeholder}
-      className={cn(
-        "block-edit w-full resize-none border-0 bg-transparent p-0 leading-inherit outline-none",
-        className,
-      )}
-      onChange={(e) => onChange(e.target.value.replace(/\u00a0/g, " "))}
-      onKeyDown={onKeyDown}
-      onPaste={onPaste}
-    />
+    <div
+      dir="auto"
+      role="textbox"
+      tabIndex={0}
+      className={cn("block-read min-h-[1.7em] w-full cursor-text", className)}
+      onClick={() => setEditing(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setEditing(true);
+        }
+      }}
+    >
+      <InlineMd text={value} onWiki={(t) => {
+        const pageId = useNotes.getState().currentId;
+        jumpWiki(pageId, t);
+      }} />
+    </div>
   );
 }
 
@@ -166,6 +266,181 @@ function ImageBlock({
   );
 }
 
+function CodeBlockView({
+  pageId,
+  block,
+}: {
+  pageId: string;
+  block: Block;
+}) {
+  const updateBlock = useNotes((s) => s.updateBlock);
+  const [editing, setEditing] = useState(!block.content);
+  const [langOpen, setLangOpen] = useState(false);
+  const lang = normalizeLang(block.lang);
+  const langs: string[] = (CODE_LANGS as readonly string[]).includes(lang)
+    ? [...CODE_LANGS]
+    : [lang, ...CODE_LANGS];
+
+  return (
+    <div className="code-block overflow-hidden rounded-md" dir="ltr">
+      <div className="relative flex items-center justify-end px-3 pt-2">
+        <button
+          type="button"
+          className="font-mono text-[11px] uppercase tracking-wide text-muted hover:text-fg"
+          onClick={() => setLangOpen((v) => !v)}
+        >
+          {lang}
+        </button>
+        {langOpen ? (
+          <div className="absolute end-2 top-7 z-20 max-h-52 w-36 overflow-y-auto rounded-md border border-border bg-surface py-1 shadow-lg">
+            {langs.map((l) => (
+              <button
+                key={l}
+                type="button"
+                className={cn(
+                  "block w-full px-3 py-1.5 text-start font-mono text-[11px] hover:bg-surface-2",
+                  l === lang && "text-fg",
+                  l !== lang && "text-muted",
+                )}
+                onClick={() => {
+                  updateBlock(pageId, block.id, { lang: l });
+                  setLangOpen(false);
+                }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {editing ? (
+        <textarea
+          value={block.content}
+          autoFocus
+          spellCheck={false}
+          onChange={(e) => updateBlock(pageId, block.id, { content: e.target.value })}
+          onBlur={() => {
+            if (block.content.trim()) setEditing(false);
+          }}
+          onPaste={(e) => void pasteInto(e, pageId, block, { allowStructured: false })}
+          className="min-h-24 w-full resize-y bg-transparent px-3 pb-3 font-mono text-[13px] leading-relaxed text-fg outline-none"
+        />
+      ) : (
+        <button type="button" className="block w-full text-start" onClick={() => setEditing(true)}>
+          <HighlightedCode code={block.content} lang={lang} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TableBlockView({
+  pageId,
+  block,
+}: {
+  pageId: string;
+  block: Block;
+}) {
+  const updateBlock = useNotes((s) => s.updateBlock);
+  const headers = block.headers ?? ["", ""];
+  const rows = block.rows ?? [["", ""]];
+  const setCell = (r: number, c: number, v: string, header: boolean) => {
+    if (header) {
+      const next = [...headers];
+      next[c] = v;
+      updateBlock(pageId, block.id, { headers: next });
+    } else {
+      const next = rows.map((row) => [...row]);
+      next[r]![c] = v;
+      updateBlock(pageId, block.id, { rows: next });
+    }
+  };
+  return (
+    <div className="overflow-x-auto rounded-md border border-border">
+      <table className="note-table w-full min-w-[280px] text-[13px]">
+        <thead>
+          <tr>
+            {headers.map((h, i) => (
+              <th key={i} className="border-b border-border bg-surface-2 p-0 font-medium">
+                <input
+                  dir="auto"
+                  value={h}
+                  onChange={(e) => setCell(0, i, e.target.value, true)}
+                  className="h-10 w-full bg-transparent px-3 outline-none"
+                />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, r) => (
+            <tr key={r}>
+              {headers.map((_, c) => (
+                <td key={c} className="border-b border-border p-0">
+                  <input
+                    dir="auto"
+                    value={row[c] ?? ""}
+                    onChange={(e) => setCell(r, c, e.target.value, false)}
+                    className="h-10 w-full bg-transparent px-3 outline-none"
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="no-print flex flex-wrap gap-3 p-2 text-[11px] text-muted">
+        <button
+          type="button"
+          className="hover:text-fg"
+          onClick={() =>
+            updateBlock(pageId, block.id, {
+              rows: [...rows, headers.map(() => "")],
+            })
+          }
+        >
+          + ردیف
+        </button>
+        <button
+          type="button"
+          className="hover:text-fg"
+          onClick={() =>
+            updateBlock(pageId, block.id, {
+              headers: [...headers, `ستون ${headers.length + 1}`],
+              rows: rows.map((row) => [...row, ""]),
+            })
+          }
+        >
+          + ستون
+        </button>
+        {rows.length > 1 ? (
+          <button
+            type="button"
+            className="hover:text-danger"
+            onClick={() => updateBlock(pageId, block.id, { rows: rows.slice(0, -1) })}
+          >
+            − ردیف
+          </button>
+        ) : null}
+        {headers.length > 1 ? (
+          <button
+            type="button"
+            className="hover:text-danger"
+            onClick={() =>
+              updateBlock(pageId, block.id, {
+                headers: headers.slice(0, -1),
+                rows: rows.map((row) => row.slice(0, -1)),
+              })
+            }
+          >
+            − ستون
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function BlockView({
   pageId,
   block,
@@ -188,10 +463,6 @@ function BlockView({
         replaceBlock(pageId, block.id, { ...emptyBlock(sc.type ?? "p"), id: block.id, ...sc });
         return;
       }
-    }
-    if (content === "/") {
-      updateBlock(pageId, block.id, { content });
-      return;
     }
     updateBlock(pageId, block.id, { content });
   }
@@ -223,30 +494,11 @@ function BlockView({
     }
   }
 
-  async function onPaste(e: ClipboardEvent<HTMLTextAreaElement>) {
-    const file = [...e.clipboardData.items]
-      .find((i) => i.type.startsWith("image/"))
-      ?.getAsFile();
-    if (file) {
-      e.preventDefault();
-      const blob = await compressImageFile(file);
-      const id = nid();
-      await saveImageBlob(id, blob);
-      const next = emptyBlock("image");
-      next.imageId = id;
-      replaceBlock(pageId, block.id, { ...next, id: block.id });
-    }
-  }
-
   const ph =
-    block.type === "h1"
-      ? "تیتر"
-      : block.type === "p"
-        ? "بنویس یا / بزن"
-        : " ";
+    block.type === "h1" ? "تیتر" : block.type === "p" ? "بنویس، پیست کن یا / بزن" : " ";
 
   const shell = (child: ReactNode) => (
-    <div className="group relative flex items-start gap-1">
+    <div className="group relative flex items-start gap-1" data-block={block.id}>
       <div className="no-print mt-1 flex w-8 shrink-0 justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         <button
           type="button"
@@ -290,99 +542,11 @@ function BlockView({
   }
 
   if (block.type === "code") {
-    return shell(
-      <div className="overflow-hidden rounded-md bg-surface-2" dir="ltr">
-        <div className="flex items-center justify-between border-b border-border px-3 py-1.5 text-[11px] text-muted">
-          <input
-            value={block.lang ?? ""}
-            onChange={(e) => updateBlock(pageId, block.id, { lang: e.target.value })}
-            className="w-24 bg-transparent font-mono outline-none"
-          />
-        </div>
-        <textarea
-          value={block.content}
-          onChange={(e) => updateBlock(pageId, block.id, { content: e.target.value })}
-          onKeyDown={key}
-          spellCheck={false}
-          className="min-h-24 w-full resize-y bg-transparent p-3 font-mono text-[13px] leading-relaxed text-fg outline-none"
-        />
-      </div>,
-    );
+    return shell(<CodeBlockView pageId={pageId} block={block} />);
   }
 
   if (block.type === "table") {
-    const headers = block.headers ?? ["", ""];
-    const rows = block.rows ?? [["", ""]];
-    const setCell = (r: number, c: number, v: string, header: boolean) => {
-      if (header) {
-        const next = [...headers];
-        next[c] = v;
-        updateBlock(pageId, block.id, { headers: next });
-      } else {
-        const next = rows.map((row) => [...row]);
-        next[r]![c] = v;
-        updateBlock(pageId, block.id, { rows: next });
-      }
-    };
-    return shell(
-      <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full min-w-[320px] text-[13px]">
-          <thead className="bg-surface-2">
-            <tr>
-              {headers.map((h, i) => (
-                <th key={i} className="border-b border-border p-0 font-medium">
-                  <input
-                    value={h}
-                    onChange={(e) => setCell(0, i, e.target.value, true)}
-                    className="h-9 w-full bg-transparent px-2 outline-none"
-                  />
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, r) => (
-              <tr key={r}>
-                {headers.map((_, c) => (
-                  <td key={c} className="border-b border-border p-0">
-                    <input
-                      value={row[c] ?? ""}
-                      onChange={(e) => setCell(r, c, e.target.value, false)}
-                      className="h-9 w-full bg-transparent px-2 outline-none"
-                    />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="flex gap-2 p-2 text-[11px]">
-          <button
-            type="button"
-            className="text-muted hover:text-fg"
-            onClick={() =>
-              updateBlock(pageId, block.id, {
-                rows: [...rows, headers.map(() => "")],
-              })
-            }
-          >
-            + ردیف
-          </button>
-          <button
-            type="button"
-            className="text-muted hover:text-fg"
-            onClick={() =>
-              updateBlock(pageId, block.id, {
-                headers: [...headers, `ستون ${headers.length + 1}`],
-                rows: rows.map((row) => [...row, ""]),
-              })
-            }
-          >
-            + ستون
-          </button>
-        </div>
-      </div>,
-    );
+    return shell(<TableBlockView pageId={pageId} block={block} />);
   }
 
   if (block.type === "toggle") {
@@ -401,7 +565,7 @@ function BlockView({
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
-            <Editable
+            <RichText
               value={block.content}
               placeholder="عنوان تاگل"
               className="font-medium"
@@ -411,7 +575,7 @@ function BlockView({
         </button>
         {block.open ? (
           <div className="border-t border-border px-3 py-2">
-            <Editable
+            <RichText
               value={block.inner ?? ""}
               placeholder="محتوای داخل تاگل"
               className="text-sm text-muted"
@@ -437,9 +601,11 @@ function BlockView({
                   "rounded-md border px-3 py-2 text-sm",
                   block.callout === "warning"
                     ? "border-warn/40 bg-warn/8"
-                    : block.callout === "tip"
+                    : block.callout === "tip" || block.callout === "example"
                       ? "border-ok/40 bg-ok/8"
-                      : "border-info/40 bg-info/8",
+                      : block.callout === "danger"
+                        ? "border-danger/40 bg-danger/8"
+                        : "border-info/40 bg-info/8",
                 )
               : "text-[15px] leading-7";
 
@@ -457,17 +623,30 @@ function BlockView({
       />
     ) : null;
 
+  const headingAttr =
+    block.type === "h1" || block.type === "h2" || block.type === "h3"
+      ? headingAnchor(block.content)
+      : undefined;
+
   return shell(
-    <div className={cn("flex gap-2", typeClass)}>
+    <div className={cn("flex gap-2", typeClass)} data-heading={headingAttr}>
       {prefix}
-      <Editable
-        value={block.content}
-        placeholder={ph}
-        className={cn("flex-1", block.checked && "text-muted line-through")}
-        onChange={onText}
-        onKeyDown={key}
-        onPaste={onPaste}
-      />
+      <div className="min-w-0 flex-1">
+        {block.type === "callout" && block.callout ? (
+          <div className="mb-1 text-[11px] font-medium tracking-wide text-muted">
+            {CALLOUT_LABEL[block.callout] ?? block.callout}
+          </div>
+        ) : null}
+        <RichText
+          value={block.content}
+          placeholder={ph}
+          className={cn("flex-1", block.checked && "text-muted line-through")}
+          onChange={onText}
+          onKeyDown={key}
+          onPaste={(e) => void pasteInto(e, pageId, block)}
+          forceEdit={block.content.startsWith("/")}
+        />
+      </div>
     </div>,
   );
 }
@@ -548,6 +727,7 @@ export function Editor() {
   const removeTag = useNotes((s) => s.removeTag);
   const insertBlock = useNotes((s) => s.insertBlock);
   const replaceBlock = useNotes((s) => s.replaceBlock);
+  const importMarkdown = useNotes((s) => s.importMarkdown);
   const setCurrent = useNotes((s) => s.setCurrent);
   const page = pages[currentId];
   const [tagInput, setTagInput] = useState("");
@@ -560,8 +740,22 @@ export function Editor() {
 
   const crumbs = breadcrumbs(pages, page.id);
 
+  function onDropMd(e: DragEvent) {
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (!/\.(md|markdown|txt)$/i.test(file.name)) return;
+    e.preventDefault();
+    void file.text().then((md) => importMarkdown(page.id, md));
+  }
+
   return (
-    <article className="print-wide mx-auto w-full max-w-3xl px-4 pt-8 pb-28 sm:px-8">
+    <article
+      className="print-wide mx-auto w-full max-w-3xl px-4 pt-8 pb-28 sm:px-8"
+      onDragOver={(e) => {
+        if ([...e.dataTransfer.items].some((i) => i.kind === "file")) e.preventDefault();
+      }}
+      onDrop={onDropMd}
+    >
       <div className="no-print mb-4 flex flex-wrap items-center gap-1 text-[12px] text-muted">
         {crumbs.map((c, i) => (
           <span key={c.id} className="flex items-center gap-1">
@@ -602,9 +796,10 @@ export function Editor() {
       </div>
 
       <input
+        dir="auto"
         value={page.title}
         onChange={(e) => updatePage(page.id, { title: e.target.value })}
-        className="mb-3 w-full bg-transparent text-[34px] font-semibold leading-tight tracking-tight outline-none placeholder:text-subtle"
+        className="mb-3 w-full bg-transparent text-[34px] font-semibold leading-tight tracking-tight outline-none placeholder:text-subtle [unicode-bidi:plaintext]"
         placeholder="عنوان صفحه"
       />
 
