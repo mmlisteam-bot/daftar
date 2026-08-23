@@ -5,6 +5,7 @@ export type SessionUser = {
 };
 
 const SESSION_KEY = "daftar-session";
+const REMEMBER_KEY = "daftar-remember";
 const NOTES_PREFIX = "daftar-notes-v2";
 
 const USERS: { id: string; username: string; name: string; hash: string }[] = [
@@ -62,10 +63,14 @@ function migrateLegacyNotes(userId: string) {
   }
 }
 
-export function getSession(): SessionUser | null {
+function readSessionRaw(): string | null {
   if (typeof localStorage === "undefined") return null;
+  return localStorage.getItem(SESSION_KEY) ?? sessionStorage.getItem(SESSION_KEY);
+}
+
+export function getSession(): SessionUser | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = readSessionRaw();
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SessionUser;
     const known = USERS.find((u) => u.id === parsed.id);
@@ -76,7 +81,28 @@ export function getSession(): SessionUser | null {
   }
 }
 
-export async function login(username: string, password: string): Promise<SessionUser | null> {
+export function getRememberedUsername(): string {
+  if (typeof localStorage === "undefined") return "";
+  try {
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    if (!raw) return "";
+    const parsed = JSON.parse(raw) as { username?: string };
+    return parsed.username ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function getRememberPref(): boolean {
+  if (typeof localStorage === "undefined") return true;
+  return localStorage.getItem(REMEMBER_KEY) !== "off";
+}
+
+export async function login(
+  username: string,
+  password: string,
+  remember = true,
+): Promise<SessionUser | null> {
   const uname = username.trim().toLowerCase();
   const digest = await sha256Hex(`${uname}:${password}`);
   const user = USERS.find((u) => u.username === uname && u.hash === digest);
@@ -84,11 +110,21 @@ export async function login(username: string, password: string): Promise<Session
   migrateLegacyNotes(user.id);
   setActiveUserId(user.id);
   const session: SessionUser = { id: user.id, username: user.username, name: user.name };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  const payload = JSON.stringify(session);
+  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
+  if (remember) {
+    localStorage.setItem(SESSION_KEY, payload);
+    localStorage.setItem(REMEMBER_KEY, JSON.stringify({ username: user.username }));
+  } else {
+    sessionStorage.setItem(SESSION_KEY, payload);
+    localStorage.setItem(REMEMBER_KEY, "off");
+  }
   return session;
 }
 
 export function logout(): void {
   localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
   setActiveUserId("guest");
 }

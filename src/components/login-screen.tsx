@@ -1,12 +1,13 @@
 import { BookOpen, Lock } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { login, type SessionUser } from "@/lib/notes/session";
+import { getRememberPref, getRememberedUsername, login, type SessionUser } from "@/lib/notes/session";
 import { migrateOwnerImages } from "@/lib/notes/images";
 
 export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => void }) {
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(getRememberedUsername);
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(getRememberPref);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -15,7 +16,7 @@ export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => v
     setError("");
     setBusy(true);
     try {
-      const user = await login(username, password);
+      const user = await login(username, password, remember);
       if (!user) {
         setError("نام کاربری یا رمز اشتباه است.");
         return;
@@ -54,7 +55,7 @@ export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => v
           />
         </label>
 
-        <label className="mb-4 block">
+        <label className="mb-3 block">
           <span className="mb-1.5 block text-[12px] text-muted">رمز عبور</span>
           <input
             dir="ltr"
@@ -66,6 +67,16 @@ export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => v
           />
         </label>
 
+        <label className="mb-4 flex cursor-pointer select-none items-center gap-2 text-[13px] text-fg">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            className="size-4 accent-[var(--accent)]"
+          />
+          مرا به خاطر بسپار
+        </label>
+
         {error ? <p className="mb-3 text-[13px] text-danger">{error}</p> : null}
 
         <Button type="submit" className="w-full" disabled={busy}>
@@ -74,7 +85,7 @@ export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => v
         </Button>
 
         <p className="mt-4 text-[11px] leading-5 text-subtle">
-          هر حساب جزوهٔ جدا دارد. نوت‌ها روی همین مرورگر می‌مانند.
+          اگر تیک را بزنی، تا وقتی خروج نزنی دوباره لاگین نمی‌خواهد.
         </p>
       </form>
     </div>
