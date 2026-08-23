@@ -20,7 +20,7 @@ export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => v
         setError("نام کاربری یا رمز اشتباه است.");
         return;
       }
-      if (user.id === "daftar") await migrateOwnerImages().catch(() => {});
+      if (user.id === "mmli") await migrateOwnerImages().catch(() => {});
       onSuccess(user);
     } finally {
       setBusy(false);

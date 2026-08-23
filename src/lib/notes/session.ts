@@ -9,16 +9,16 @@ const NOTES_PREFIX = "daftar-notes-v2";
 
 const USERS: { id: string; username: string; name: string; hash: string }[] = [
   {
-    id: "daftar",
-    username: "daftar",
-    name: "دفتر من",
-    hash: "5a444b15487f3094c0fd0d24d2e8a91105535a432441d8a9de395552972261f4",
+    id: "mmli",
+    username: "mmli",
+    name: "mmli",
+    hash: "23b767b8165c38065d609eaed068cab4e26c670361497ce4816bd720e29f7a08",
   },
   {
-    id: "rafiq",
-    username: "rafiq",
-    name: "رفیق",
-    hash: "027e834f1c8917db44464111234192722bf123291938055e9ceb8441830f8d53",
+    id: "hadis",
+    username: "hadis",
+    name: "hadis",
+    hash: "5ce9bb0a0f996217508a7b9b42be32aa999f1287a3e239ceb9531e66f4926b82",
   },
 ];
 
@@ -41,13 +41,20 @@ async function sha256Hex(text: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function copyIfMissing(fromKey: string, toKey: string) {
+  const dest = localStorage.getItem(toKey);
+  const src = localStorage.getItem(fromKey);
+  if (!dest && src) localStorage.setItem(toKey, src);
+}
+
 function migrateLegacyNotes(userId: string) {
   if (typeof localStorage === "undefined") return;
-  if (userId !== "daftar") return;
-  const namespaced = localStorage.getItem(notesStorageKey("daftar"));
-  const legacy = localStorage.getItem(NOTES_PREFIX);
-  if (!namespaced && legacy) {
-    localStorage.setItem(notesStorageKey("daftar"), legacy);
+  if (userId === "mmli") {
+    copyIfMissing(NOTES_PREFIX, notesStorageKey("mmli"));
+    copyIfMissing(notesStorageKey("daftar"), notesStorageKey("mmli"));
+  }
+  if (userId === "hadis") {
+    copyIfMissing(notesStorageKey("rafiq"), notesStorageKey("hadis"));
   }
 }
 

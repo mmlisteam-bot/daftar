@@ -31,8 +31,13 @@ function openNamed(name: string): Promise<IDBDatabase | null> {
 
 export async function migrateOwnerImages(): Promise<void> {
   if (typeof indexedDB === "undefined") return;
-  const dest = await openNamed("daftar-images-daftar");
-  const src = await openNamed("daftar-images");
+  await copyImageDb("daftar-images", "daftar-images-mmli");
+  await copyImageDb("daftar-images-daftar", "daftar-images-mmli");
+}
+
+async function copyImageDb(srcName: string, destName: string): Promise<void> {
+  const dest = await openNamed(destName);
+  const src = await openNamed(srcName);
   if (!dest || !src) return;
   const destCount = await new Promise<number>((resolve) => {
     const tx = dest.transaction(STORE, "readonly");
