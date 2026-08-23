@@ -1,0 +1,92 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-warn: var(--warn);
+  --color-ok: var(--ok);
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+}
+
+:root,
+.light {
+  --bg: #f3f0e8;
+  --surface: #fbf9f4;
+  --surface-2: #ebe6dc;
+  --fg: #1c1b18;
+  --muted: #6a675f;
+  --subtle: #8f8b82;
+  --border: color-mix(in oklab, var(--fg) 12%, transparent);
+  --accent: #3d4450;
+  --accent-fg: #fbf9f4;
+  --danger: #b42318;
+  --info: #3d5a73;
+  --warn: #8a5a18;
+  --ok: #3d6b4f;
+}
+
+.dark {
+  --bg: #0c0d0f;
+  --surface: #141518;
+  --surface-2: #1c1e22;
+  --fg: #eceae6;
+  --muted: #8c8c88;
+  --subtle: #5c5c58;
+  --border: color-mix(in oklab, var(--fg) 12%, transparent);
+  --accent: #c8ccd4;
+  --accent-fg: #0c0d0f;
+  --danger: #e07a72;
+  --info: #8aa4bb;
+  --warn: #c4a36a;
+  --ok: #8fba9c;
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  html, body, #app { min-height: 100%; background: var(--bg); color: var(--fg); }
+  body { font-family: var(--font-sans); line-height: 1.55; }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+}
+
+.block-edit {
+  outline: none;
+  display: block;
+  width: 100%;
+  min-height: 1.7em;
+  field-sizing: content;
+  overflow: visible;
+}
+.block-edit::placeholder { color: var(--subtle); }
+
+@media print {
+  .no-print { display: none !important; }
+  .print-wide {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+    color: black !important;
+  }
+}
