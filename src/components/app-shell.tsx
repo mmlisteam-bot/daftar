@@ -3,6 +3,7 @@ import {
   FileArchive,
   FileJson,
   FileText,
+  Layers,
   Menu,
   Moon,
   Printer,
@@ -16,6 +17,7 @@ import {
 import { useEffect, useState } from "react";
 import { BackupPrompt } from "@/components/backup-prompt";
 import { Editor } from "@/components/editor";
+import { Flashcards } from "@/components/flashcards";
 import { LoginScreen } from "@/components/login-screen";
 import { PayloadPanel } from "@/components/payload-panel";
 import { SearchDialog } from "@/components/search-dialog";
@@ -83,6 +85,7 @@ function NotesWorkspace({
   const [mobileNav, setMobileNav] = useState(false);
   const [payloads, setPayloads] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
+  const [cards, setCards] = useState(false);
 
   useEffect(() => {
     primeWorkspace();
@@ -112,7 +115,7 @@ function NotesWorkspace({
     root.classList.toggle("light", theme === "light");
   }, [theme]);
 
-  const snapshot: NotesSnapshot = { pages, order, currentId, theme, expanded, trash };
+  const snapshot: NotesSnapshot = { pages, order, currentId, theme, expanded, trash, recentIds: useNotes.getState().recentIds };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -268,6 +271,15 @@ function NotesWorkspace({
           <Button
             variant="ghost"
             size="icon-sm"
+            onClick={() => setCards(true)}
+            aria-label="فلش‌کارت"
+            title="فلش‌کارت"
+          >
+            <Layers className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => undo()}
             disabled={!canUndo}
             aria-label="واگرد"
@@ -409,6 +421,7 @@ function NotesWorkspace({
 
       <SearchDialog open={search} onOpenChange={setSearch} />
       <PayloadPanel open={payloads} onClose={() => setPayloads(false)} />
+      <Flashcards open={cards} onClose={() => setCards(false)} />
       <BackupPrompt userName={user.username} open={backupOpen} onClose={closeBackup} />
     </div>
   );

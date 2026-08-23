@@ -2,6 +2,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Copy,
+  History,
   LayoutTemplate,
   LogOut,
   Plus,
@@ -236,6 +237,7 @@ export function Sidebar({
   const pages = useNotes((s) => s.pages);
   const order = useNotes((s) => s.order);
   const trash = useNotes((s) => s.trash);
+  const recentIds = useNotes((s) => s.recentIds);
   const filterTag = useNotes((s) => s.filterTag);
   const setFilterTag = useNotes((s) => s.setFilterTag);
   const createPage = useNotes((s) => s.createPage);
@@ -258,6 +260,11 @@ export function Sidebar({
   const starred = useMemo(
     () => Object.values(pages).filter((p) => p.starred),
     [pages],
+  );
+
+  const recents = useMemo(
+    () => (recentIds ?? []).map((id) => pages[id]).filter(Boolean) as Page[],
+    [recentIds, pages],
   );
 
   const trashList = useMemo(
@@ -353,6 +360,27 @@ export function Sidebar({
                 className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] text-muted hover:bg-surface-2 hover:text-fg"
               >
                 <Star className="size-3.5 shrink-0 text-warn" fill="currentColor" />
+                <PageGlyph name={p.icon} className="size-3.5 opacity-80" />
+                <span className="truncate">{p.title || "بدون عنوان"}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {recents.length > 0 ? (
+          <div className="mb-3">
+            <div className="mb-1 px-1 text-[11px] font-medium text-subtle">اخیر</div>
+            {recents.map((p) => (
+              <button
+                key={`r-${p.id}`}
+                type="button"
+                onClick={() => {
+                  setCurrent(p.id);
+                  onClose?.();
+                }}
+                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] text-muted hover:bg-surface-2 hover:text-fg"
+              >
+                <History className="size-3.5 shrink-0" />
                 <PageGlyph name={p.icon} className="size-3.5 opacity-80" />
                 <span className="truncate">{p.title || "بدون عنوان"}</span>
               </button>

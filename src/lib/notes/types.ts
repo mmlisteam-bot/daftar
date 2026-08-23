@@ -70,6 +70,7 @@ export type NotesSnapshot = {
   theme: "dark" | "light";
   expanded: Record<string, boolean>;
   trash?: Record<string, Page>;
+  recentIds?: string[];
 };
 
 export function nid(): string {

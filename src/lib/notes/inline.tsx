@@ -4,10 +4,11 @@ type Seg =
   | { k: "text"; v: string }
   | { k: "b" | "i" | "s" | "code"; v: string }
   | { k: "a"; v: string; href: string }
-  | { k: "wiki"; v: string; target: string };
+  | { k: "wiki"; v: string; target: string }
+  | { k: "mark"; v: string };
 
 const TOKEN =
-  /(\*\*[^*]+\*\*|__[^_]+__|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\([^)]+\)|\[\[[^\]]+\]\]|\*[^*]+\*|_[^_]+_)/g;
+  /(\*\*[^*]+\*\*|==[^=]+==|__[^_]+__|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\([^)]+\)|\[\[[^\]]+\]\]|\*[^*]+\*|_[^_]+_)/g;
 
 function splitInline(src: string): Seg[] {
   const out: Seg[] = [];
@@ -19,6 +20,8 @@ function splitInline(src: string): Seg[] {
     const t = m[0];
     if ((t.startsWith("**") && t.endsWith("**")) || (t.startsWith("__") && t.endsWith("__"))) {
       out.push({ k: "b", v: t.slice(2, -2) });
+    } else if (t.startsWith("==") && t.endsWith("==")) {
+      out.push({ k: "mark", v: t.slice(2, -2) });
     } else if (t.startsWith("~~") && t.endsWith("~~")) {
       out.push({ k: "s", v: t.slice(2, -2) });
     } else if (t.startsWith("`") && t.endsWith("`")) {
@@ -87,6 +90,13 @@ export function InlineMd({
                 >
                   {seg.v}
                 </a>
+              );
+            }
+            if (seg.k === "mark") {
+              return (
+                <mark key={key} className="hl-mark">
+                  {seg.v}
+                </mark>
               );
             }
             if (seg.k === "wiki") {

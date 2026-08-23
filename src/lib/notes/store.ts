@@ -61,6 +61,7 @@ type NotesState = NotesSnapshot & {
   histRev: number;
   scrollToBlock: string | null;
   trash: Record<string, Page>;
+  recentIds: string[];
   setHydrated: (v: boolean) => void;
   setTheme: (t: "dark" | "light") => void;
   setCurrent: (id: string, blockId?: string | null) => void;
@@ -195,10 +196,18 @@ export const useNotes = create<NotesState>()(
         histRev: 0,
         scrollToBlock: null,
         trash: {},
+        recentIds: [],
         setHydrated: (v) => set({ hydrated: v }),
         setTheme: (theme) => set({ theme }),
-        setCurrent: (id, blockId) =>
-          set({ currentId: id, filterTag: get().filterTag, scrollToBlock: blockId ?? null }),
+        setCurrent: (id, blockId) => {
+          const recents = [id, ...get().recentIds.filter((x) => x !== id && get().pages[x])].slice(0, 5);
+          set({
+            currentId: id,
+            filterTag: get().filterTag,
+            scrollToBlock: blockId ?? null,
+            recentIds: recents,
+          });
+        },
         setFilterTag: (filterTag) => set({ filterTag }),
         toggleExpanded: (id) =>
           set((s) => ({ expanded: { ...s.expanded, [id]: !s.expanded[id] } })),
@@ -260,7 +269,13 @@ export const useNotes = create<NotesState>()(
           if (ids.includes(currentId)) {
             nextCurrent = nextOrder[0] ?? Object.keys(nextPages)[0]!;
           }
-          set({ pages: nextPages, order: nextOrder, currentId: nextCurrent, trash: nextTrash });
+          set({
+            pages: nextPages,
+            order: nextOrder,
+            currentId: nextCurrent,
+            trash: nextTrash,
+            recentIds: get().recentIds.filter((x) => !ids.includes(x)),
+          });
         },
         restorePage: (id) => {
           const { pages, order, trash } = get();
@@ -556,6 +571,7 @@ export const useNotes = create<NotesState>()(
             theme: data.theme === "light" ? "light" : "dark",
             expanded: data.expanded ?? {},
             trash: data.trash ?? {},
+            recentIds: data.recentIds ?? get().recentIds,
           });
         },
         importMarkdown: (pageId, md) => {
@@ -610,6 +626,7 @@ export const useNotes = create<NotesState>()(
             histRev: 0,
             trash: {},
             scrollToBlock: null,
+            recentIds: [],
           });
         },
         undo: () => {
@@ -654,6 +671,7 @@ export const useNotes = create<NotesState>()(
         theme: s.theme,
         expanded: s.expanded,
         trash: s.trash ?? {},
+        recentIds: s.recentIds ?? [],
       }),
     },
   ),

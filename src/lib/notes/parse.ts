@@ -373,6 +373,39 @@ export function htmlToBlocks(html: string): Block[] {
   return out.length ? out : [];
 }
 
+export function parseTsvGrid(text: string): string[][] {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line, i, arr) => !(i === arr.length - 1 && line === ""))
+    .map((line) => line.split("\t"));
+}
+
+export function clipboardToGrid(data: DataTransfer): string[][] | null {
+  const html = data.getData("text/html");
+  if (html && /<table/i.test(html)) {
+    try {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const table = doc.querySelector("table");
+      if (table) {
+        const grid: string[][] = [];
+        for (const tr of table.querySelectorAll("tr")) {
+          const cells = [...tr.querySelectorAll("th,td")].map((td) => (td.textContent ?? "").trim());
+          if (cells.length) grid.push(cells);
+        }
+        if (grid.length) return grid;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  const text = data.getData("text/plain");
+  if (!text) return null;
+  if (text.includes("\t") || looksLikeTsv(text)) return parseTsvGrid(text);
+  return null;
+}
+
 export function clipboardToBlocks(data: DataTransfer): Block[] | null {
   const text = data.getData("text/plain");
   const html = data.getData("text/html");

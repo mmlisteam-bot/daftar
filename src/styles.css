@@ -210,3 +210,19 @@
     color: black !important;
   }
 }
+
+.hl-mark {
+  background: color-mix(in oklab, #e4c35a 55%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding-inline: 0.12em;
+  box-decoration-break: clone;
+}
+
+.dark .hl-mark {
+  background: color-mix(in oklab, #e4c35a 32%, transparent);
+}
+
+.lightbox {
+  cursor: zoom-in;
+}

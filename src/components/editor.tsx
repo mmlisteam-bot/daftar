@@ -1,7 +1,10 @@
 import {
+  Check,
   ChevronDown,
   Code2,
+  Copy,
   GripVertical,
+  Highlighter,
   ImagePlus,
   Plus,
   Star,
@@ -22,8 +25,9 @@ import { Button } from "@/components/ui/button";
 import { HighlightedCode } from "@/lib/notes/highlight";
 import { headingAnchor, InlineMd } from "@/lib/notes/inline";
 import { compressImageFile, deleteImageBlob, getImageBlob, saveImageBlob } from "@/lib/notes/images";
-import { clipboardToBlocks, CODE_LANGS, normalizeLang } from "@/lib/notes/parse";
+import { clipboardToBlocks, clipboardToGrid, CODE_LANGS, normalizeLang } from "@/lib/notes/parse";
 import { breadcrumbs, getChildren, useNotes } from "@/lib/notes/store";
+import { todoStats } from "@/lib/notes/cards";
 import {
   emptyBlock,
   nid,
@@ -52,6 +56,17 @@ const SLASH: { type: BlockType; label: string; hint: string; callout?: CalloutKi
   { type: "table", label: "جدول", hint: "table" },
   { type: "toggle", label: "تاگل", hint: "toggle" },
   { type: "divider", label: "خط جداکننده", hint: "---" },
+];
+
+const CONVERT: { type: BlockType; label: string }[] = [
+  { type: "p", label: "متن" },
+  { type: "h1", label: "تیتر ۱" },
+  { type: "h2", label: "تیتر ۲" },
+  { type: "h3", label: "تیتر ۳" },
+  { type: "code", label: "کد" },
+  { type: "ul", label: "لیست" },
+  { type: "todo", label: "تودو" },
+  { type: "quote", label: "نقل‌قول" },
 ];
 
 const CALLOUT_LABEL: Record<CalloutKind, string> = {
@@ -226,7 +241,23 @@ function RichText({
           className,
         )}
         onChange={(e) => onChange(e.target.value.replace(/\u00a0/g, " "))}
-        onKeyDown={onKeyDown}
+        onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "h") {
+            e.preventDefault();
+            const el = e.currentTarget;
+            const s = el.selectionStart;
+            const end = el.selectionEnd;
+            if (s !== end) {
+              onChange(value.slice(0, s) + "==" + value.slice(s, end) + "==" + value.slice(end));
+            } else if (value.startsWith("==") && value.endsWith("==") && value.length >= 4) {
+              onChange(value.slice(2, -2));
+            } else {
+              onChange(`==${value}==`);
+            }
+            return;
+          }
+          onKeyDown?.(e);
+        }}
         onPaste={onPaste}
         onBlur={() => {
           if (value.trim() && !value.startsWith("/")) setEditing(false);
@@ -265,6 +296,7 @@ function ImageBlock({
   onUploaded: (imageId: string) => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [lite, setLite] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -282,6 +314,15 @@ function ImageBlock({
       if (revoke) URL.revokeObjectURL(revoke);
     };
   }, [block.imageId]);
+
+  useEffect(() => {
+    if (!lite) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLite(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lite]);
 
   async function handleFile(file: File) {
     const blob = await compressImageFile(file);
@@ -302,7 +343,9 @@ function ImageBlock({
       }}
     >
       {url ? (
-        <img src={url} alt="" className="max-h-[480px] w-full object-contain" />
+        <button type="button" className="lightbox block w-full" onClick={() => setLite(true)}>
+          <img src={url} alt="" className="max-h-[480px] w-full object-contain" />
+        </button>
       ) : (
         <button
           type="button"
@@ -323,6 +366,14 @@ function ImageBlock({
           if (file) void handleFile(file);
         }}
       />
+      {lite && url ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLite(false)}
+        >
+          <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -337,6 +388,7 @@ function CodeBlockView({
   const updateBlock = useNotes((s) => s.updateBlock);
   const [editing, setEditing] = useState(!block.content);
   const [langOpen, setLangOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const lang = normalizeLang(block.lang);
   const langs: string[] = (CODE_LANGS as readonly string[]).includes(lang)
     ? [...CODE_LANGS]
@@ -344,7 +396,21 @@ function CodeBlockView({
 
   return (
     <div className="code-block overflow-hidden rounded-md" dir="ltr">
-      <div className="relative flex items-center justify-end px-3 pt-2">
+      <div className="relative flex items-center justify-end gap-2 px-3 pt-2">
+        <button
+          type="button"
+          className="flex items-center gap-1 font-mono text-[11px] text-muted hover:text-fg"
+          title="کپی"
+          onClick={(e) => {
+            e.stopPropagation();
+            void navigator.clipboard.writeText(block.content).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
+            });
+          }}
+        >
+          {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
+        </button>
         <button
           type="button"
           className="font-mono text-[11px] uppercase tracking-wide text-muted hover:text-fg"
@@ -416,6 +482,38 @@ function TableBlockView({
       updateBlock(pageId, block.id, { rows: next });
     }
   };
+
+  function pasteGrid(e: ClipboardEvent<HTMLInputElement>, startR: number, startC: number, header: boolean) {
+    const grid = clipboardToGrid(e.clipboardData);
+    if (!grid?.length) return;
+    e.preventDefault();
+    let h = [...headers];
+    let body = rows.map((row) => [...row]);
+    const origin = header ? -1 : startR;
+    for (let i = 0; i < grid.length; i++) {
+      const rr = origin + i;
+      const line = grid[i]!;
+      for (let j = 0; j < line.length; j++) {
+        const cc = startC + j;
+        while (h.length <= cc) {
+          h.push(`ستون ${h.length + 1}`);
+          body = body.map((row) => [...row, ""]);
+        }
+        if (rr < 0) h[cc] = line[j]!;
+        else {
+          while (body.length <= rr) body.push(h.map(() => ""));
+          while (body[rr]!.length < h.length) body[rr]!.push("");
+          body[rr]![cc] = line[j]!;
+        }
+      }
+    }
+    body = body.map((row) => {
+      const n = [...row];
+      while (n.length < h.length) n.push("");
+      return n.slice(0, h.length);
+    });
+    updateBlock(pageId, block.id, { headers: h, rows: body });
+  }
   return (
     <div className="overflow-x-auto rounded-md border border-border">
       <table className="note-table w-full min-w-[280px] text-[13px]">
@@ -427,6 +525,7 @@ function TableBlockView({
                   dir="auto"
                   value={h}
                   onChange={(e) => setCell(0, i, e.target.value, true)}
+                  onPaste={(e) => pasteGrid(e, 0, i, true)}
                   className="h-10 w-full bg-transparent px-3 outline-none"
                 />
               </th>
@@ -442,6 +541,7 @@ function TableBlockView({
                     dir="auto"
                     value={row[c] ?? ""}
                     onChange={(e) => setCell(r, c, e.target.value, false)}
+                    onPaste={(e) => pasteGrid(e, r, c, false)}
                     className="h-10 w-full bg-transparent px-3 outline-none"
                   />
                 </td>
@@ -519,6 +619,19 @@ function BlockView({
   const reorderBlocks = useNotes((s) => s.reorderBlocks);
   const [dropOver, setDropOver] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+
+  const canConvert = CONVERT.some((c) => c.type === block.type) || block.type === "callout" || block.type === "ol";
+  const canHighlight =
+    block.type === "p" ||
+    block.type === "h1" ||
+    block.type === "h2" ||
+    block.type === "h3" ||
+    block.type === "ul" ||
+    block.type === "ol" ||
+    block.type === "todo" ||
+    block.type === "quote" ||
+    block.type === "callout";
 
   function onText(content: string) {
     if (block.type === "p") {
@@ -586,7 +699,7 @@ function BlockView({
     >
       <div
         className={cn(
-          "no-print relative mt-1 flex w-8 shrink-0 justify-end gap-0.5 transition-opacity",
+          "no-print relative mt-1 flex w-7 shrink-0 flex-col items-center gap-0.5 transition-opacity",
           addOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100",
         )}
       >
@@ -621,15 +734,68 @@ function BlockView({
         >
           <GripVertical className="size-3.5" />
         </button>
+        {canConvert ? (
+          <button
+            type="button"
+            className="flex size-6 items-center justify-center rounded text-subtle hover:bg-surface-2"
+            title="تبدیل بلاک"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={() => setConvertOpen((v) => !v)}
+          >
+            <Type className="size-3.5" />
+          </button>
+        ) : null}
+        {convertOpen ? (
+          <div className="absolute start-full top-0 z-30 ms-1 w-36 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+            {CONVERT.map((item) => (
+              <button
+                key={item.type}
+                type="button"
+                className={cn(
+                  "flex w-full px-3 py-1.5 text-start text-[12px] hover:bg-surface-2",
+                  item.type === block.type ? "text-fg" : "text-muted",
+                )}
+                onClick={() => {
+                  const next = { ...block, type: item.type };
+                  if (item.type === "code") next.lang = block.lang || "text";
+                  if (item.type === "todo") next.checked = block.checked ?? false;
+                  replaceBlock(pageId, block.id, next);
+                  setConvertOpen(false);
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="min-w-0 flex-1 py-0.5">{child}</div>
-      <button
-        type="button"
-        className="no-print mt-1 flex size-6 shrink-0 items-center justify-center rounded text-subtle opacity-0 hover:text-danger group-hover:opacity-100"
-        onClick={() => removeBlock(pageId, block.id)}
-      >
-        <Trash2 className="size-3.5" />
-      </button>
+      <div className="no-print mt-1 flex w-6 shrink-0 flex-col items-center">
+        {canHighlight ? (
+          <button
+            type="button"
+            className="flex size-6 items-center justify-center rounded text-subtle opacity-0 hover:text-warn group-hover:opacity-100"
+            title="هایلایت (Ctrl+H)"
+            onClick={() => {
+              const t = block.content;
+              if (t.startsWith("==") && t.endsWith("==") && t.length >= 4) {
+                updateBlock(pageId, block.id, { content: t.slice(2, -2) });
+              } else if (t.trim()) {
+                updateBlock(pageId, block.id, { content: `==${t}==` });
+              }
+            }}
+          >
+            <Highlighter className="size-3.5" />
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="flex size-6 items-center justify-center rounded text-subtle opacity-0 hover:text-danger group-hover:opacity-100"
+          onClick={() => removeBlock(pageId, block.id)}
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      </div>
     </div>
   );
 
@@ -830,6 +996,26 @@ function PageToc({ page }: { page: Page }) {
   );
 }
 
+function LabProgress({ page }: { page: Page }) {
+  const pages = useNotes((s) => s.pages);
+  const { done, total } = todoStats(page, pages);
+  if (total === 0) return null;
+  const pct = Math.round((done / total) * 100);
+  return (
+    <div className="no-print mb-5">
+      <div className="mb-1 flex justify-between text-[11px] text-muted">
+        <span>پیشرفت لاب</span>
+        <span>
+          {done} از {total} · {pct}٪
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+        <div className="h-full rounded-full bg-ok transition-[width]" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function ChildCards({ page }: { page: Page }) {
   const pages = useNotes((s) => s.pages);
   const setCurrent = useNotes((s) => s.setCurrent);
@@ -999,6 +1185,7 @@ export function Editor() {
         />
       </div>
 
+      <LabProgress page={page} />
       <PageToc page={page} />
 
       <ChildCards page={page} />
