@@ -1,18 +1,22 @@
 import {
   ChevronDown,
   ChevronLeft,
+  Copy,
   LayoutTemplate,
   LogOut,
   Plus,
+  RotateCcw,
   Search,
+  Share,
+  Star,
   Terminal,
   Trash2,
   X,
 } from "lucide-react";
-import { useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { PageGlyph } from "@/components/page-icon";
 import { Button } from "@/components/ui/button";
-import { allTags, getChildren, useNotes } from "@/lib/notes/store";
+import { allTags, getChildren, trashDaysLeft, useNotes } from "@/lib/notes/store";
 import { PAGE_TEMPLATES } from "@/lib/notes/templates";
 import type { Page } from "@/lib/notes/types";
 import { cn } from "@/lib/utils";
@@ -20,9 +24,13 @@ import { cn } from "@/lib/utils";
 function PageRow({
   page,
   depth,
+  compact,
+  onNavigate,
 }: {
   page: Page;
   depth: number;
+  compact?: boolean;
+  onNavigate?: () => void;
 }) {
   const pages = useNotes((s) => s.pages);
   const currentId = useNotes((s) => s.currentId);
@@ -31,6 +39,8 @@ function PageRow({
   const toggleExpanded = useNotes((s) => s.toggleExpanded);
   const createPage = useNotes((s) => s.createPage);
   const deletePage = useNotes((s) => s.deletePage);
+  const duplicatePage = useNotes((s) => s.duplicatePage);
+  const toggleStar = useNotes((s) => s.toggleStar);
   const movePage = useNotes((s) => s.movePage);
   const kids = getChildren(pages, page.id);
   const open = expanded[page.id] ?? false;
@@ -65,20 +75,26 @@ function PageRow({
     movePage(id, page.id, zoneFor(e));
   }
 
+  const actions = cn(
+    "flex size-6 items-center justify-center rounded",
+    compact ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+  );
+
   return (
     <div>
       <div
-        draggable
+        draggable={!compact}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragLeave={() => setOver(null)}
         onDrop={onDrop}
         className={cn(
-          "group relative flex h-8 items-center rounded-md pe-1 text-[13px] transition-colors",
+          "group relative flex items-center rounded-md pe-0.5 text-[13px] transition-colors",
+          compact ? "h-9" : "h-8",
           active ? "bg-surface-2 text-fg" : "text-muted hover:bg-surface-2/70 hover:text-fg",
           over === "inside" && "ring-1 ring-accent/50",
         )}
-        style={{ paddingInlineStart: 8 + depth * 12 }}
+        style={{ paddingInlineStart: 6 + depth * (compact ? 8 : 12) }}
       >
         {over === "before" ? (
           <span className="pointer-events-none absolute inset-x-2 top-0 h-px bg-accent" />
@@ -89,26 +105,48 @@ function PageRow({
         {kids.length > 0 ? (
           <button
             type="button"
-            className="flex size-6 items-center justify-center rounded text-subtle"
+            className="flex size-6 shrink-0 items-center justify-center rounded text-subtle"
             onClick={() => toggleExpanded(page.id)}
             aria-label={open ? "بستن" : "باز کردن"}
           >
             {open ? <ChevronDown className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
           </button>
         ) : (
-          <span className="size-6" />
+          <span className="size-6 shrink-0" />
         )}
         <button
           type="button"
           className="flex min-w-0 flex-1 items-center gap-2 text-start"
-          onClick={() => setCurrent(page.id)}
+          onClick={() => {
+            setCurrent(page.id);
+            onNavigate?.();
+          }}
         >
           <PageGlyph name={page.icon} className="size-3.5 opacity-80" />
           <span className="truncate">{page.title || "بدون عنوان"}</span>
         </button>
         <button
           type="button"
-          className="flex size-6 items-center justify-center rounded opacity-0 hover:bg-bg group-hover:opacity-100"
+          className={cn(
+            "flex size-6 items-center justify-center rounded",
+            page.starred ? "text-warn opacity-100" : cn(actions, "hover:text-warn"),
+          )}
+          title={page.starred ? "حذف از محبوب‌ها" : "محبوب"}
+          onClick={() => toggleStar(page.id)}
+        >
+          <Star className="size-3.5" fill={page.starred ? "currentColor" : "none"} />
+        </button>
+        <button
+          type="button"
+          className={cn(actions, "hover:bg-bg")}
+          title="کپی صفحه"
+          onClick={() => duplicatePage(page.id)}
+        >
+          <Copy className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          className={cn(actions, "hover:bg-bg")}
           title="زیرصفحه"
           onClick={() => createPage({ parentId: page.id })}
         >
@@ -116,18 +154,66 @@ function PageRow({
         </button>
         <button
           type="button"
-          className="flex size-6 items-center justify-center rounded opacity-0 hover:bg-bg hover:text-danger group-hover:opacity-100"
+          className={cn(actions, "hover:bg-bg hover:text-danger")}
           title="حذف"
           onClick={() => {
-            if (confirm(`«${page.title}» و زیرصفحه‌هایش حذف شوند؟`)) deletePage(page.id);
+            if (confirm(`«${page.title || "بدون عنوان"}» به سطل زباله برود؟ تا ۷ روز قابل برگشت است.`)) {
+              deletePage(page.id);
+            }
           }}
         >
           <Trash2 className="size-3.5" />
         </button>
       </div>
       {open
-        ? kids.map((c) => <PageRow key={c.id} page={c} depth={depth + 1} />)
+        ? kids.map((c) => (
+            <PageRow key={c.id} page={c} depth={depth + 1} compact={compact} onNavigate={onNavigate} />
+          ))
         : null}
+    </div>
+  );
+}
+
+function InstallHint() {
+  const [deferred, setDeferred] = useState<{ prompt: () => Promise<void> } | null>(null);
+  const [iosHint, setIosHint] = useState(false);
+  const standalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia("(display-mode: standalone)").matches ||
+      ("standalone" in navigator && Boolean((navigator as { standalone?: boolean }).standalone)));
+  const ios = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  useEffect(() => {
+    const onPip = (e: Event) => {
+      e.preventDefault();
+      const ev = e as Event & { prompt: () => Promise<void> };
+      setDeferred(ev);
+    };
+    window.addEventListener("beforeinstallprompt", onPip);
+    return () => window.removeEventListener("beforeinstallprompt", onPip);
+  }, []);
+
+  if (standalone) return null;
+  if (!deferred && !ios) return null;
+
+  return (
+    <div className="px-2 pb-1">
+      <button
+        type="button"
+        className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] text-muted hover:bg-surface-2 hover:text-fg"
+        onClick={() => {
+          if (deferred) void deferred.prompt();
+          else setIosHint((v) => !v);
+        }}
+      >
+        <Share className="size-3.5" />
+        افزودن به صفحهٔ اصلی
+      </button>
+      {iosHint ? (
+        <p className="px-2 pb-1 text-[11px] leading-5 text-subtle">
+          در Safari دکمه Share را بزن، بعد Add to Home Screen.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -138,21 +224,28 @@ export function Sidebar({
   userName,
   onLogout,
   onOpenPayloads,
+  compact,
 }: {
   onOpenSearch: () => void;
   onClose?: () => void;
   userName?: string;
   onLogout?: () => void;
   onOpenPayloads?: () => void;
+  compact?: boolean;
 }) {
   const pages = useNotes((s) => s.pages);
   const order = useNotes((s) => s.order);
+  const trash = useNotes((s) => s.trash);
   const filterTag = useNotes((s) => s.filterTag);
   const setFilterTag = useNotes((s) => s.setFilterTag);
   const createPage = useNotes((s) => s.createPage);
   const createFromTemplate = useNotes((s) => s.createFromTemplate);
+  const restorePage = useNotes((s) => s.restorePage);
+  const dropForever = useNotes((s) => s.dropForever);
+  const setCurrent = useNotes((s) => s.setCurrent);
   const [tagQ, setTagQ] = useState("");
   const [tplOpen, setTplOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
 
   const roots = useMemo(() => {
     const list = order.map((id) => pages[id]).filter(Boolean) as Page[];
@@ -162,13 +255,24 @@ export function Sidebar({
     return list.filter(match);
   }, [order, pages, filterTag]);
 
+  const starred = useMemo(
+    () => Object.values(pages).filter((p) => p.starred),
+    [pages],
+  );
+
+  const trashList = useMemo(
+    () =>
+      Object.values(trash ?? {}).sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0)),
+    [trash],
+  );
+
   const tags = allTags(pages).filter((t) =>
     tagQ.trim() ? t.tag.toLowerCase().includes(tagQ.trim().toLowerCase()) : true,
   );
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col bg-surface">
-      <div className="flex items-center justify-between gap-2 px-3 pt-4 pb-2">
+      <div className={cn("flex items-center justify-between gap-2 px-3", compact ? "pt-3 pb-1" : "pt-4 pb-2")}>
         <div className="min-w-0">
           <div className="text-[15px] font-semibold tracking-tight">Daftar</div>
           <div className="truncate text-[11px] text-muted">{userName ?? "جزوه پنتست وب"}</div>
@@ -188,7 +292,7 @@ export function Sidebar({
         >
           <Search className="size-3.5" />
           جستجو
-          <kbd className="ms-auto rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-subtle">
+          <kbd className="ms-auto hidden rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-subtle sm:inline">
             Ctrl K
           </kbd>
         </button>
@@ -219,6 +323,7 @@ export function Sidebar({
                   onClick={() => {
                     createFromTemplate(tpl);
                     setTplOpen(false);
+                    onClose?.();
                   }}
                 >
                   <PageGlyph name={tpl.icon} className="mt-0.5 size-3.5 text-muted" />
@@ -234,6 +339,27 @@ export function Sidebar({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+        {starred.length > 0 ? (
+          <div className="mb-3">
+            <div className="mb-1 px-1 text-[11px] font-medium text-subtle">محبوب‌ها</div>
+            {starred.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setCurrent(p.id);
+                  onClose?.();
+                }}
+                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] text-muted hover:bg-surface-2 hover:text-fg"
+              >
+                <Star className="size-3.5 shrink-0 text-warn" fill="currentColor" />
+                <PageGlyph name={p.icon} className="size-3.5 opacity-80" />
+                <span className="truncate">{p.title || "بدون عنوان"}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         <div className="mb-1 flex items-center justify-between px-1">
           <span className="text-[11px] font-medium text-subtle">صفحات</span>
           <button
@@ -246,7 +372,7 @@ export function Sidebar({
           </button>
         </div>
         {roots.map((p) => (
-          <PageRow key={p.id} page={p} depth={0} />
+          <PageRow key={p.id} page={p} depth={0} compact={compact} onNavigate={onClose} />
         ))}
 
         <div className="mt-5 px-1 text-[11px] font-medium text-subtle">تگ‌ها</div>
@@ -284,7 +410,56 @@ export function Sidebar({
             پاک کردن فیلتر
           </button>
         ) : null}
+
+        <div className="mt-5">
+          <button
+            type="button"
+            className="flex h-8 w-full items-center gap-2 rounded-md px-1 text-[11px] font-medium text-subtle hover:text-fg"
+            onClick={() => setTrashOpen((v) => !v)}
+          >
+            <Trash2 className="size-3.5" />
+            سطل زباله
+            {trashList.length ? <span className="opacity-70">{trashList.length}</span> : null}
+          </button>
+          {trashOpen ? (
+            trashList.length === 0 ? (
+              <div className="px-2 py-2 text-[12px] text-subtle">خالی است. صفحات تا ۷ روز اینجا می‌مانند.</div>
+            ) : (
+              <div className="space-y-0.5">
+                {trashList.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-1 rounded-md px-1 py-1 text-[12px] text-muted"
+                  >
+                    <PageGlyph name={p.icon} className="size-3.5 opacity-70" />
+                    <span className="min-w-0 flex-1 truncate">{p.title || "بدون عنوان"}</span>
+                    <span className="text-[10px] text-subtle">{trashDaysLeft(p.deletedAt ?? 0)}ر</span>
+                    <button
+                      type="button"
+                      className="flex size-6 items-center justify-center rounded hover:bg-surface-2 hover:text-fg"
+                      title="برگرداندن"
+                      onClick={() => restorePage(p.id)}
+                    >
+                      <RotateCcw className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className="flex size-6 items-center justify-center rounded hover:bg-surface-2 hover:text-danger"
+                      title="حذف دائمی"
+                      onClick={() => {
+                        if (confirm("برای همیشه حذف شود؟")) dropForever(p.id);
+                      }}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : null}
+        </div>
       </div>
+      <InstallHint />
       {onLogout ? (
         <div className="border-t border-border p-2">
           <button

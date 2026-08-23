@@ -4,6 +4,7 @@ import {
   GripVertical,
   ImagePlus,
   Plus,
+  Star,
   Trash2,
   Type,
 } from "lucide-react";
@@ -796,6 +797,39 @@ function SlashMenu({
   );
 }
 
+function PageToc({ page }: { page: Page }) {
+  const heads = page.blocks.filter(
+    (b) => (b.type === "h1" || b.type === "h2" || b.type === "h3") && b.content.trim(),
+  );
+  if (heads.length < 3) return null;
+  return (
+    <nav className="no-print mb-6 rounded-lg border border-border bg-surface px-3 py-2.5">
+      <div className="mb-1.5 text-[11px] font-medium text-subtle">فهرست مطالب</div>
+      <div className="flex flex-col gap-0.5">
+        {heads.map((h) => (
+          <button
+            key={h.id}
+            type="button"
+            className={cn(
+              "truncate text-start text-[13px] text-muted hover:text-fg",
+              h.type === "h2" && "ps-3",
+              h.type === "h3" && "ps-6 text-[12px]",
+            )}
+            onClick={() =>
+              document.querySelector(`[data-block="${h.id}"]`)?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              })
+            }
+          >
+            {h.content}
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 function ChildCards({ page }: { page: Page }) {
   const pages = useNotes((s) => s.pages);
   const setCurrent = useNotes((s) => s.setCurrent);
@@ -833,11 +867,28 @@ export function Editor() {
   const replaceBlock = useNotes((s) => s.replaceBlock);
   const importMarkdown = useNotes((s) => s.importMarkdown);
   const setCurrent = useNotes((s) => s.setCurrent);
+  const toggleStar = useNotes((s) => s.toggleStar);
+  const scrollToBlock = useNotes((s) => s.scrollToBlock);
   const page = pages[currentId];
   const [tagInput, setTagInput] = useState("");
   const [slashFor, setSlashFor] = useState<string | null>(null);
   const [iconOpen, setIconOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+
+  useEffect(() => {
+    if (!scrollToBlock) return;
+    const id = scrollToBlock;
+    const t = window.setTimeout(() => {
+      const el = document.querySelector(`[data-block="${id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("block-flash");
+        window.setTimeout(() => el.classList.remove("block-flash"), 1400);
+      }
+      useNotes.setState({ scrollToBlock: null });
+    }, 40);
+    return () => window.clearTimeout(t);
+  }, [scrollToBlock, currentId]);
 
   if (!page) {
     return <div className="p-10 text-muted">صفحه‌ای انتخاب نشده.</div>;
@@ -900,13 +951,26 @@ export function Editor() {
         ) : null}
       </div>
 
-      <input
-        dir="auto"
-        value={page.title}
-        onChange={(e) => updatePage(page.id, { title: e.target.value })}
-        className="mb-3 w-full bg-transparent text-[34px] font-semibold leading-tight tracking-tight outline-none placeholder:text-subtle [unicode-bidi:plaintext]"
-        placeholder="عنوان صفحه"
-      />
+      <div className="mb-3 flex items-start gap-2">
+        <input
+          dir="auto"
+          value={page.title}
+          onChange={(e) => updatePage(page.id, { title: e.target.value })}
+          className="min-w-0 flex-1 bg-transparent text-[34px] font-semibold leading-tight tracking-tight outline-none placeholder:text-subtle [unicode-bidi:plaintext]"
+          placeholder="عنوان صفحه"
+        />
+        <button
+          type="button"
+          className={cn(
+            "no-print mt-2 flex size-9 shrink-0 items-center justify-center rounded-md hover:bg-surface-2",
+            page.starred ? "text-warn" : "text-subtle",
+          )}
+          title={page.starred ? "حذف از محبوب‌ها" : "محبوب"}
+          onClick={() => toggleStar(page.id)}
+        >
+          <Star className="size-4" fill={page.starred ? "currentColor" : "none"} />
+        </button>
+      </div>
 
       <div className="no-print mb-6 flex flex-wrap items-center gap-1.5">
         {page.tags.map((t) => (
@@ -934,6 +998,8 @@ export function Editor() {
           className="h-7 w-28 bg-transparent text-[12px] outline-none placeholder:text-subtle"
         />
       </div>
+
+      <PageToc page={page} />
 
       <ChildCards page={page} />
 

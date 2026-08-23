@@ -183,6 +183,20 @@
   text-align: start;
 }
 
+.block-flash {
+  animation: daftar-flash 1.2s ease;
+}
+
+@keyframes daftar-flash {
+  0%,
+  20% {
+    background: color-mix(in oklab, var(--accent) 18%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
 @media print {
   .no-print {
     display: none !important;

@@ -36,6 +36,10 @@ export function AppShell() {
     if (s) setActiveUserId(s.id);
     setUser(s);
     setReady(true);
+    if ("serviceWorker" in navigator) {
+      const sw = `${import.meta.env.BASE_URL}sw.js`.replace(/\/{2,}/g, "/");
+      void navigator.serviceWorker.register(sw).catch(() => {});
+    }
   }, []);
 
   if (!ready) return <div className="h-dvh bg-bg" />;
@@ -66,6 +70,7 @@ function NotesWorkspace({
   const currentId = useNotes((s) => s.currentId);
   const order = useNotes((s) => s.order);
   const expanded = useNotes((s) => s.expanded);
+  const trash = useNotes((s) => s.trash);
   const importSnapshot = useNotes((s) => s.importSnapshot);
   const importMarkdown = useNotes((s) => s.importMarkdown);
   const resetDemo = useNotes((s) => s.resetDemo);
@@ -84,8 +89,12 @@ function NotesWorkspace({
     const done = () => setHydrated(true);
     const maybe = useNotes.persist.rehydrate();
     if (maybe && typeof (maybe as Promise<void>).then === "function") {
-      void (maybe as Promise<void>).then(done, done);
+      void (maybe as Promise<void>).then(() => {
+        useNotes.getState().purgeTrash();
+        done();
+      }, done);
     } else {
+      useNotes.getState().purgeTrash();
       done();
     }
   }, [setHydrated, primeWorkspace]);
@@ -103,7 +112,7 @@ function NotesWorkspace({
     root.classList.toggle("light", theme === "light");
   }, [theme]);
 
-  const snapshot: NotesSnapshot = { pages, order, currentId, theme, expanded };
+  const snapshot: NotesSnapshot = { pages, order, currentId, theme, expanded, trash };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -122,6 +131,7 @@ function NotesWorkspace({
         currentId: s.currentId,
         theme: s.theme,
         expanded: s.expanded,
+        trash: s.trash,
       };
       if (k === "s") {
         e.preventDefault();
@@ -222,8 +232,9 @@ function NotesWorkspace({
             aria-label="بستن"
             onClick={() => setMobileNav(false)}
           />
-          <div className="absolute inset-y-0 start-0 w-[min(100%,280px)] border-e border-border">
+          <div className="absolute inset-y-0 start-0 w-[min(100%,320px)] border-e border-border">
             <Sidebar
+              compact
               onOpenSearch={() => {
                 setSearch(true);
                 setMobileNav(false);

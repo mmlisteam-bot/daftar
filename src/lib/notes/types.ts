@@ -59,6 +59,8 @@ export type Page = {
   createdAt: number;
   updatedAt: number;
   sort?: number;
+  starred?: boolean;
+  deletedAt?: number;
 };
 
 export type NotesSnapshot = {
@@ -67,6 +69,7 @@ export type NotesSnapshot = {
   currentId: string;
   theme: "dark" | "light";
   expanded: Record<string, boolean>;
+  trash?: Record<string, Page>;
 };
 
 export function nid(): string {

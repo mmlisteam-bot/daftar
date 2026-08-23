@@ -26,7 +26,9 @@ function workspaceForUser() {
   return getActiveUserId() === "hadis" ? blankWorkspace() : createSeed();
 }
 
-type Slice = Pick<NotesSnapshot, "pages" | "order" | "currentId" | "expanded">;
+type Slice = Pick<NotesSnapshot, "pages" | "order" | "currentId" | "expanded" | "trash">;
+
+const TRASH_MS = 7 * 24 * 60 * 60 * 1000;
 
 const past: Slice[] = [];
 const future: Slice[] = [];
@@ -41,6 +43,7 @@ function cloneSlice(s: Slice): Slice {
       order: s.order,
       currentId: s.currentId,
       expanded: s.expanded,
+      trash: s.trash ?? {},
     }),
   ) as Slice;
 }
@@ -56,14 +59,21 @@ type NotesState = NotesSnapshot & {
   filterTag: string | null;
   hydrated: boolean;
   histRev: number;
+  scrollToBlock: string | null;
+  trash: Record<string, Page>;
   setHydrated: (v: boolean) => void;
   setTheme: (t: "dark" | "light") => void;
-  setCurrent: (id: string) => void;
+  setCurrent: (id: string, blockId?: string | null) => void;
   setFilterTag: (tag: string | null) => void;
   toggleExpanded: (id: string) => void;
+  toggleStar: (id: string) => void;
   createPage: (opts?: { parentId?: string | null; title?: string; icon?: PageIcon }) => string;
   createFromTemplate: (tpl: PageTemplate, parentId?: string | null) => string;
+  duplicatePage: (id: string) => string | null;
   deletePage: (id: string) => void;
+  restorePage: (id: string) => void;
+  purgeTrash: () => void;
+  dropForever: (id: string) => void;
   movePage: (dragId: string, targetId: string, pos: "before" | "after" | "inside") => void;
   updatePage: (id: string, patch: Partial<Pick<Page, "title" | "icon" | "tags">>) => void;
   addTag: (id: string, tag: string) => void;
@@ -104,6 +114,29 @@ export function getChildren(pages: Record<string, Page>, parentId: string | null
   return Object.values(pages)
     .filter((p) => p.parentId === parentId)
     .sort((a, b) => (a.sort ?? a.createdAt) - (b.sort ?? b.createdAt));
+}
+
+function clonePageRecord(page: Page, titleSuffix = " (کپی)"): Page {
+  const now = Date.now();
+  return {
+    ...page,
+    id: nid(),
+    title: page.title ? `${page.title}${titleSuffix}` : "کپی",
+    starred: false,
+    createdAt: now,
+    updatedAt: now,
+    sort: now,
+    blocks: page.blocks.map((b) => ({
+      ...b,
+      id: nid(),
+      headers: b.headers ? [...b.headers] : undefined,
+      rows: b.rows ? b.rows.map((r) => [...r]) : undefined,
+    })),
+  };
+}
+
+export function trashDaysLeft(deletedAt: number): number {
+  return Math.max(0, Math.ceil((deletedAt + TRASH_MS - Date.now()) / 86_400_000));
 }
 
 export function breadcrumbs(pages: Record<string, Page>, id: string): Page[] {
@@ -160,12 +193,26 @@ export const useNotes = create<NotesState>()(
         filterTag: null,
         hydrated: false,
         histRev: 0,
+        scrollToBlock: null,
+        trash: {},
         setHydrated: (v) => set({ hydrated: v }),
         setTheme: (theme) => set({ theme }),
-        setCurrent: (id) => set({ currentId: id, filterTag: get().filterTag }),
+        setCurrent: (id, blockId) =>
+          set({ currentId: id, filterTag: get().filterTag, scrollToBlock: blockId ?? null }),
         setFilterTag: (filterTag) => set({ filterTag }),
         toggleExpanded: (id) =>
           set((s) => ({ expanded: { ...s.expanded, [id]: !s.expanded[id] } })),
+        toggleStar: (id) =>
+          set((s) => {
+            const page = s.pages[id];
+            if (!page) return s;
+            return {
+              pages: {
+                ...s.pages,
+                [id]: { ...page, starred: !page.starred, updatedAt: Date.now() },
+              },
+            };
+          }),
         createPage: (opts) => {
           capture();
           const page = emptyPage({
@@ -195,18 +242,92 @@ export const useNotes = create<NotesState>()(
           return page.id;
         },
         deletePage: (id) => {
-          const { pages, order, currentId } = get();
+          const { pages, order, currentId, trash } = get();
           if (!pages[id] || Object.keys(pages).length <= 1) return;
           capture();
           const ids = [id, ...descendants(pages, id)];
+          const now = Date.now();
           const nextPages = { ...pages };
-          for (const d of ids) delete nextPages[d];
+          const nextTrash = { ...trash };
+          for (const d of ids) {
+            const p = nextPages[d];
+            if (!p) continue;
+            nextTrash[d] = { ...p, deletedAt: now };
+            delete nextPages[d];
+          }
           const nextOrder = order.filter((x) => !ids.includes(x));
           let nextCurrent = currentId;
           if (ids.includes(currentId)) {
             nextCurrent = nextOrder[0] ?? Object.keys(nextPages)[0]!;
           }
-          set({ pages: nextPages, order: nextOrder, currentId: nextCurrent });
+          set({ pages: nextPages, order: nextOrder, currentId: nextCurrent, trash: nextTrash });
+        },
+        restorePage: (id) => {
+          const { pages, order, trash } = get();
+          const item = trash[id];
+          if (!item) return;
+          capture();
+          const now = Date.now();
+          const nextTrash = { ...trash };
+          delete nextTrash[id];
+          const parentOk = item.parentId && pages[item.parentId];
+          const restored: Page = {
+            ...item,
+            deletedAt: undefined,
+            parentId: parentOk ? item.parentId : null,
+            updatedAt: now,
+          };
+          const nextOrder = restored.parentId ? order : [...order, restored.id];
+          set({
+            pages: { ...pages, [restored.id]: restored },
+            order: nextOrder,
+            trash: nextTrash,
+            currentId: restored.id,
+            expanded: restored.parentId
+              ? { ...get().expanded, [restored.parentId]: true }
+              : get().expanded,
+          });
+        },
+        dropForever: (id) => {
+          const { trash } = get();
+          if (!trash[id]) return;
+          capture();
+          const next = { ...trash };
+          delete next[id];
+          set({ trash: next });
+        },
+        purgeTrash: () => {
+          const { trash } = get();
+          const cutoff = Date.now() - TRASH_MS;
+          const next: Record<string, Page> = {};
+          let changed = false;
+          for (const [id, p] of Object.entries(trash)) {
+            if ((p.deletedAt ?? 0) >= cutoff) next[id] = p;
+            else changed = true;
+          }
+          if (changed) set({ trash: next });
+        },
+        duplicatePage: (id) => {
+          const { pages, order } = get();
+          const src = pages[id];
+          if (!src) return null;
+          capture();
+          const copy = clonePageRecord(src);
+          copy.parentId = src.parentId;
+          if (src.parentId === null) {
+            const nextOrder = [...order];
+            const i = nextOrder.indexOf(id);
+            nextOrder.splice(i < 0 ? nextOrder.length : i + 1, 0, copy.id);
+            set({ pages: { ...pages, [copy.id]: copy }, order: nextOrder, currentId: copy.id });
+          } else {
+            copy.sort = (src.sort ?? src.createdAt) + 1;
+            set({
+              pages: { ...pages, [copy.id]: copy },
+              currentId: copy.id,
+              expanded: { ...get().expanded, [src.parentId]: true },
+            });
+          }
+          return copy.id;
         },
         movePage: (dragId, targetId, pos) => {
           if (dragId === targetId) return;
@@ -434,6 +555,7 @@ export const useNotes = create<NotesState>()(
             currentId: data.currentId && data.pages[data.currentId] ? data.currentId : data.order[0]!,
             theme: data.theme === "light" ? "light" : "dark",
             expanded: data.expanded ?? {},
+            trash: data.trash ?? {},
           });
         },
         importMarkdown: (pageId, md) => {
@@ -471,6 +593,7 @@ export const useNotes = create<NotesState>()(
             currentId: fresh.order[0]!,
             expanded: {},
             filterTag: null,
+            trash: {},
           });
         },
         primeWorkspace: () => {
@@ -485,6 +608,8 @@ export const useNotes = create<NotesState>()(
             filterTag: null,
             hydrated: false,
             histRev: 0,
+            trash: {},
+            scrollToBlock: null,
           });
         },
         undo: () => {
@@ -528,6 +653,7 @@ export const useNotes = create<NotesState>()(
         currentId: s.currentId,
         theme: s.theme,
         expanded: s.expanded,
+        trash: s.trash ?? {},
       }),
     },
   ),

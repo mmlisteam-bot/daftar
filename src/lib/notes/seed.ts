@@ -59,6 +59,7 @@ export function createSeed(): { pages: Record<string, Page>; order: string[] } {
       ),
     ],
   );
+  pages[PAGE.home]!.starred = true;
 
   pages[PAGE.http] = page(
     PAGE.http,
