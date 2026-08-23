@@ -1,9 +1,11 @@
 import {
   ChevronDown,
+  Code2,
   GripVertical,
   ImagePlus,
   Plus,
   Trash2,
+  Type,
 } from "lucide-react";
 import {
   useEffect,
@@ -60,6 +62,59 @@ const CALLOUT_LABEL: Record<CalloutKind, string> = {
   danger: "خطر",
   example: "مثال",
 };
+
+function NewBlockChooser({
+  onPick,
+  onClose,
+}: {
+  onPick: (type: "p" | "code") => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    window.addEventListener("keydown", onEsc);
+    window.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onEsc);
+      window.removeEventListener("mousedown", onDown);
+    };
+  }, [onClose]);
+  return (
+    <div
+      ref={ref}
+      className="absolute start-7 top-7 z-30 w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg"
+    >
+      <button
+        type="button"
+        className="flex w-full items-center gap-2.5 px-3 py-2 text-start hover:bg-surface-2"
+        onClick={() => onPick("code")}
+      >
+        <Code2 className="size-4 shrink-0 text-muted" />
+        <span>
+          <span className="block text-[13px]">کد است</span>
+          <span className="block text-[11px] text-subtle">بلاک کد با تگ زبان</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        className="flex w-full items-center gap-2.5 px-3 py-2 text-start hover:bg-surface-2"
+        onClick={() => onPick("p")}
+      >
+        <Type className="size-4 shrink-0 text-muted" />
+        <span>
+          <span className="block text-[13px]">متن خالی</span>
+          <span className="block text-[11px] text-subtle">پاراگراف معمولی</span>
+        </span>
+      </button>
+    </div>
+  );
+}
 
 function applyMarkdownShortcut(text: string): Partial<Block> | null {
   if (text === "# " || text === "#") return { type: "h1", content: "" };
@@ -457,6 +512,7 @@ function BlockView({
   const moveBlock = useNotes((s) => s.moveBlock);
   const reorderBlocks = useNotes((s) => s.reorderBlocks);
   const [dropOver, setDropOver] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   function onText(content: string) {
     if (block.type === "p") {
@@ -522,15 +578,30 @@ function BlockView({
         reorderBlocks(pageId, raw.slice("daftar-block:".length), block.id);
       }}
     >
-      <div className="no-print mt-1 flex w-8 shrink-0 justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+      <div
+        className={cn(
+          "no-print relative mt-1 flex w-8 shrink-0 justify-end gap-0.5 transition-opacity",
+          addOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+        )}
+      >
         <button
           type="button"
           className="flex size-6 items-center justify-center rounded text-subtle hover:bg-surface-2"
-          onClick={() => insertBlock(pageId, block.id, "p")}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={() => setAddOpen((v) => !v)}
           title="بلاک جدید"
         >
           <Plus className="size-3.5" />
         </button>
+        {addOpen ? (
+          <NewBlockChooser
+            onPick={(type) => {
+              insertBlock(pageId, block.id, type);
+              setAddOpen(false);
+            }}
+            onClose={() => setAddOpen(false)}
+          />
+        ) : null}
         <button
           type="button"
           draggable
@@ -761,6 +832,7 @@ export function Editor() {
   const [tagInput, setTagInput] = useState("");
   const [slashFor, setSlashFor] = useState<string | null>(null);
   const [iconOpen, setIconOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   if (!page) {
     return <div className="p-10 text-muted">صفحه‌ای انتخاب نشده.</div>;
@@ -884,11 +956,25 @@ export function Editor() {
             ) : null}
           </div>
         ))}
-        <div className="no-print pt-4">
-          <Button variant="ghost" size="sm" onClick={() => insertBlock(page.id, page.blocks.at(-1)?.id ?? null)}>
+        <div className="no-print relative pt-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={() => setAddOpen((v) => !v)}
+          >
             <Plus className="size-3.5" />
             بلاک جدید
           </Button>
+          {addOpen ? (
+            <NewBlockChooser
+              onPick={(type) => {
+                insertBlock(page.id, page.blocks.at(-1)?.id ?? null, type);
+                setAddOpen(false);
+              }}
+              onClose={() => setAddOpen(false)}
+            />
+          ) : null}
         </div>
       </div>
     </article>
