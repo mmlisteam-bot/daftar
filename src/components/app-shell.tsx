@@ -8,17 +8,50 @@ import {
   RotateCcw,
   Sun,
   Upload,
+  Wand2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Editor } from "@/components/editor";
+import { LoginScreen } from "@/components/login-screen";
 import { SearchDialog } from "@/components/search-dialog";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
-import { downloadText, pageToMarkdown } from "@/lib/notes/markdown";
+import { downloadText, pageToMarkdown, blockToMarkdown } from "@/lib/notes/markdown";
+import { getSession, logout, setActiveUserId, type SessionUser } from "@/lib/notes/session";
 import { useNotes } from "@/lib/notes/store";
 import type { NotesSnapshot } from "@/lib/notes/types";
 
 export function AppShell() {
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const s = getSession();
+    if (s) setActiveUserId(s.id);
+    setUser(s);
+    setReady(true);
+  }, []);
+
+  if (!ready) return <div className="h-dvh bg-bg" />;
+  if (!user) return <LoginScreen onSuccess={setUser} />;
+  return (
+    <NotesWorkspace
+      user={user}
+      onLogout={() => {
+        logout();
+        setUser(null);
+      }}
+    />
+  );
+}
+
+function NotesWorkspace({
+  user,
+  onLogout,
+}: {
+  user: SessionUser;
+  onLogout: () => void;
+}) {
   const setHydrated = useNotes((s) => s.setHydrated);
   const theme = useNotes((s) => s.theme);
   const setTheme = useNotes((s) => s.setTheme);
@@ -29,11 +62,13 @@ export function AppShell() {
   const importSnapshot = useNotes((s) => s.importSnapshot);
   const importMarkdown = useNotes((s) => s.importMarkdown);
   const resetDemo = useNotes((s) => s.resetDemo);
+  const primeWorkspace = useNotes((s) => s.primeWorkspace);
   const [search, setSearch] = useState(false);
   const [menu, setMenu] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
 
   useEffect(() => {
+    primeWorkspace();
     const done = () => setHydrated(true);
     const maybe = useNotes.persist.rehydrate();
     if (maybe && typeof (maybe as Promise<void>).then === "function") {
@@ -41,7 +76,7 @@ export function AppShell() {
     } else {
       done();
     }
-  }, [setHydrated]);
+  }, [setHydrated, primeWorkspace]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -61,6 +96,15 @@ export function AppShell() {
   }, []);
 
   const page = pages[currentId];
+
+  function convertMarkdownOnPage() {
+    if (!page) return;
+    const md = page.blocks
+      .map((b) => (b.type === "p" || b.type === "quote" ? b.content : blockToMarkdown(b)))
+      .filter(Boolean)
+      .join("\n\n");
+    importMarkdown(page.id, md);
+  }
 
   function exportMd() {
     if (!page) return;
@@ -94,7 +138,11 @@ export function AppShell() {
   return (
     <div className="flex h-dvh min-h-0 bg-bg text-fg">
       <div className="no-print hidden h-full w-[272px] shrink-0 border-e border-border md:block">
-        <Sidebar onOpenSearch={() => setSearch(true)} />
+        <Sidebar
+          onOpenSearch={() => setSearch(true)}
+          userName={user.name}
+          onLogout={onLogout}
+        />
       </div>
 
       {mobileNav ? (
@@ -112,6 +160,8 @@ export function AppShell() {
                 setMobileNav(false);
               }}
               onClose={() => setMobileNav(false)}
+              userName={user.name}
+              onLogout={onLogout}
             />
           </div>
         </div>
@@ -177,6 +227,17 @@ export function AppShell() {
                 >
                   <FileJson className="size-3.5" />
                   پشتیبان JSON
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-start text-[13px] hover:bg-surface-2"
+                  onClick={() => {
+                    convertMarkdownOnPage();
+                    setMenu(false);
+                  }}
+                >
+                  <Wand2 className="size-3.5" />
+                  تبدیل Markdown همین صفحه
                 </button>
                 <label className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-[13px] hover:bg-surface-2">
                   <FileText className="size-3.5" />

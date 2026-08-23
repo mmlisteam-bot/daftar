@@ -1,6 +1,7 @@
 import {
   ChevronDown,
   ChevronLeft,
+  LogOut,
   Plus,
   Search,
   Trash2,
@@ -91,9 +92,13 @@ function PageRow({
 export function Sidebar({
   onOpenSearch,
   onClose,
+  userName,
+  onLogout,
 }: {
   onOpenSearch: () => void;
   onClose?: () => void;
+  userName?: string;
+  onLogout?: () => void;
 }) {
   const pages = useNotes((s) => s.pages);
   const order = useNotes((s) => s.order);
@@ -119,7 +124,7 @@ export function Sidebar({
       <div className="flex items-center justify-between gap-2 px-3 pt-4 pb-2">
         <div className="min-w-0">
           <div className="text-[15px] font-semibold tracking-tight">Daftar</div>
-          <div className="text-[11px] text-muted">جزوه پنتست وب</div>
+          <div className="truncate text-[11px] text-muted">{userName ?? "جزوه پنتست وب"}</div>
         </div>
         {onClose ? (
           <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="بستن منو">
@@ -194,6 +199,18 @@ export function Sidebar({
           </button>
         ) : null}
       </div>
+      {onLogout ? (
+        <div className="border-t border-border p-2">
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-[13px] text-muted hover:bg-surface-2 hover:text-fg"
+          >
+            <LogOut className="size-3.5" />
+            خروج
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }

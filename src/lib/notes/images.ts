@@ -1,9 +1,14 @@
-const DB_NAME = "daftar-images";
+import { getActiveUserId } from "./session";
+
 const STORE = "blobs";
+
+function dbName(): string {
+  return `daftar-images-${getActiveUserId()}`;
+}
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(dbName(), 1);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
@@ -11,6 +16,51 @@ function openDb(): Promise<IDBDatabase> {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+}
+
+function openNamed(name: string): Promise<IDBDatabase | null> {
+  return new Promise((resolve) => {
+    const req = indexedDB.open(name, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+export async function migrateOwnerImages(): Promise<void> {
+  if (typeof indexedDB === "undefined") return;
+  const dest = await openNamed("daftar-images-daftar");
+  const src = await openNamed("daftar-images");
+  if (!dest || !src) return;
+  const destCount = await new Promise<number>((resolve) => {
+    const tx = dest.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).count();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(0);
+  });
+  if (destCount > 0) {
+    dest.close();
+    src.close();
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const read = src.transaction(STORE, "readonly").objectStore(STORE).openCursor();
+    const write = dest.transaction(STORE, "readwrite");
+    read.onsuccess = () => {
+      const cursor = read.result;
+      if (!cursor) {
+        write.oncomplete = () => resolve();
+        return;
+      }
+      write.objectStore(STORE).put(cursor.value, cursor.key);
+      cursor.continue();
+    };
+    read.onerror = () => reject(read.error);
+  });
+  dest.close();
+  src.close();
 }
 
 export async function saveImageBlob(id: string, blob: Blob): Promise<void> {

@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { markdownToBlocks } from "./parse";
 import { createSeed } from "./seed";
+import { getActiveUserId } from "./session";
 import {
   emptyBlock,
   emptyPage,
@@ -38,6 +39,7 @@ type NotesState = NotesSnapshot & {
   importSnapshot: (data: NotesSnapshot) => void;
   importMarkdown: (pageId: string, md: string) => void;
   resetDemo: () => void;
+  primeWorkspace: () => void;
 };
 
 function childrenOf(pages: Record<string, Page>, parentId: string): Page[] {
@@ -307,10 +309,34 @@ export const useNotes = create<NotesState>()(
           filterTag: null,
         });
       },
+      primeWorkspace: () => {
+        const fresh = createSeed();
+        set({
+          pages: fresh.pages,
+          order: fresh.order,
+          currentId: fresh.order[0]!,
+          theme: "dark",
+          expanded: { [fresh.order[2] ?? ""]: true },
+          filterTag: null,
+          hydrated: false,
+        });
+      },
     }),
     {
       name: "daftar-notes-v2",
       skipHydration: true,
+      storage: createJSONStorage(() => ({
+        getItem: (name) => {
+          if (typeof localStorage === "undefined") return null;
+          return localStorage.getItem(`${name}:${getActiveUserId()}`);
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(`${name}:${getActiveUserId()}`, value);
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(`${name}:${getActiveUserId()}`);
+        },
+      })),
       partialize: (s) => ({
         pages: s.pages,
         order: s.order,
