@@ -269,17 +269,19 @@ function NotesWorkspace({
                     }}
                   />
                 </label>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-start text-[13px] text-danger hover:bg-surface-2"
-                  onClick={() => {
-                    if (confirm("بازگشت به جزوه نمونه؟ نوت‌های فعلی جایگزین می‌شوند.")) resetDemo();
-                    setMenu(false);
-                  }}
-                >
-                  <RotateCcw className="size-3.5" />
-                  جزوه نمونه
-                </button>
+                {user.id === "mmli" ? (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-start text-[13px] text-danger hover:bg-surface-2"
+                    onClick={() => {
+                      if (confirm("بازگشت به جزوه نمونه؟ نوت‌های فعلی جایگزین می‌شوند.")) resetDemo();
+                      setMenu(false);
+                    }}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    جزوه نمونه
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

@@ -54,7 +54,11 @@ function migrateLegacyNotes(userId: string) {
     copyIfMissing(notesStorageKey("daftar"), notesStorageKey("mmli"));
   }
   if (userId === "hadis") {
-    copyIfMissing(notesStorageKey("rafiq"), notesStorageKey("hadis"));
+    if (!localStorage.getItem("daftar-hadis-blank-v1")) {
+      localStorage.removeItem(notesStorageKey("hadis"));
+      localStorage.removeItem(notesStorageKey("rafiq"));
+      localStorage.setItem("daftar-hadis-blank-v1", "1");
+    }
   }
 }
 

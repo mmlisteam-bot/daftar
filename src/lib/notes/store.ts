@@ -16,6 +16,15 @@ import {
 
 const seed = createSeed();
 
+function blankWorkspace(): { pages: Record<string, Page>; order: string[] } {
+  const page = emptyPage({ title: "", icon: "file" });
+  return { pages: { [page.id]: page }, order: [page.id] };
+}
+
+function workspaceForUser() {
+  return getActiveUserId() === "hadis" ? blankWorkspace() : createSeed();
+}
+
 type NotesState = NotesSnapshot & {
   filterTag: string | null;
   hydrated: boolean;
@@ -300,23 +309,23 @@ export const useNotes = create<NotesState>()(
         });
       },
       resetDemo: () => {
-        const fresh = createSeed();
+        const fresh = workspaceForUser();
         set({
           pages: fresh.pages,
           order: fresh.order,
           currentId: fresh.order[0]!,
-          expanded: { [fresh.order[2] ?? ""]: true },
+          expanded: {},
           filterTag: null,
         });
       },
       primeWorkspace: () => {
-        const fresh = createSeed();
+        const fresh = workspaceForUser();
         set({
           pages: fresh.pages,
           order: fresh.order,
           currentId: fresh.order[0]!,
           theme: "dark",
-          expanded: { [fresh.order[2] ?? ""]: true },
+          expanded: {},
           filterTag: null,
           hydrated: false,
         });
