@@ -6,6 +6,7 @@
 @theme {
   --font-sans: "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -19,6 +20,7 @@
   --color-info: var(--info);
   --color-warn: var(--warn);
   --color-ok: var(--ok);
+
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -60,13 +62,42 @@
 }
 
 @layer base {
-  * { border-color: var(--border); }
-  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-  html, body, #app { min-height: 100%; background: var(--bg); color: var(--fg); }
-  body { font-family: var(--font-sans); line-height: 1.55; }
-  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
-  h1, h2, h3 { text-wrap: balance; }
-  p { text-wrap: pretty; }
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html,
+  body,
+  #app {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    line-height: 1.55;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
 }
 
 .block-edit {
@@ -77,10 +108,15 @@
   field-sizing: content;
   overflow: visible;
 }
-.block-edit::placeholder { color: var(--subtle); }
+
+.block-edit::placeholder {
+  color: var(--subtle);
+}
 
 @media print {
-  .no-print { display: none !important; }
+  .no-print {
+    display: none !important;
+  }
   .print-wide {
     width: 100% !important;
     margin: 0 !important;
