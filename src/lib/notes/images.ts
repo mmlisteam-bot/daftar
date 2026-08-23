@@ -102,6 +102,55 @@ export async function deleteImageBlob(id: string): Promise<void> {
   db.close();
 }
 
+export async function listImageEntries(): Promise<{ id: string; blob: Blob }[]> {
+  const db = await openDb();
+  const entries: { id: string; blob: Blob }[] = [];
+  await new Promise<void>((resolve, reject) => {
+    const req = db.transaction(STORE, "readonly").objectStore(STORE).openCursor();
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (!cursor) {
+        resolve();
+        return;
+      }
+      entries.push({ id: String(cursor.key), blob: cursor.value as Blob });
+      cursor.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return entries;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function exportImagesMap(): Promise<Record<string, string>> {
+  const entries = await listImageEntries();
+  const out: Record<string, string> = {};
+  for (const entry of entries) out[entry.id] = await blobToDataUrl(entry.blob);
+  return out;
+}
+
+export async function importImagesMap(map: Record<string, string> | undefined): Promise<void> {
+  if (!map) return;
+  for (const [id, url] of Object.entries(map)) {
+    if (!url) continue;
+    try {
+      const blob = await (await fetch(url)).blob();
+      await saveImageBlob(id, blob);
+    } catch {
+      /* skip broken image */
+    }
+  }
+}
+
 export function compressImageFile(file: File, maxW = 1400): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);

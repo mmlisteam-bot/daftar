@@ -1,21 +1,27 @@
 import {
   Download,
+  FileArchive,
   FileJson,
   FileText,
   Menu,
   Moon,
   Printer,
+  Redo2,
   RotateCcw,
   Sun,
+  Undo2,
   Upload,
   Wand2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { BackupPrompt } from "@/components/backup-prompt";
 import { Editor } from "@/components/editor";
 import { LoginScreen } from "@/components/login-screen";
+import { PayloadPanel } from "@/components/payload-panel";
 import { SearchDialog } from "@/components/search-dialog";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
+import { applyBackupImages, downloadAllZip, downloadJsonBackup, parseBackupFile } from "@/lib/notes/backup";
 import { downloadText, pageToMarkdown, blockToMarkdown } from "@/lib/notes/markdown";
 import { getSession, logout, setActiveUserId, type SessionUser } from "@/lib/notes/session";
 import { useNotes } from "@/lib/notes/store";
@@ -53,6 +59,7 @@ function NotesWorkspace({
   onLogout: () => void;
 }) {
   const setHydrated = useNotes((s) => s.setHydrated);
+  const hydrated = useNotes((s) => s.hydrated);
   const theme = useNotes((s) => s.theme);
   const setTheme = useNotes((s) => s.setTheme);
   const pages = useNotes((s) => s.pages);
@@ -63,9 +70,14 @@ function NotesWorkspace({
   const importMarkdown = useNotes((s) => s.importMarkdown);
   const resetDemo = useNotes((s) => s.resetDemo);
   const primeWorkspace = useNotes((s) => s.primeWorkspace);
+  const undo = useNotes((s) => s.undo);
+  const redo = useNotes((s) => s.redo);
+  const histRev = useNotes((s) => s.histRev);
   const [search, setSearch] = useState(false);
   const [menu, setMenu] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const [payloads, setPayloads] = useState(false);
+  const [backupOpen, setBackupOpen] = useState(false);
 
   useEffect(() => {
     primeWorkspace();
@@ -79,23 +91,63 @@ function NotesWorkspace({
   }, [setHydrated, primeWorkspace]);
 
   useEffect(() => {
+    if (!hydrated) return;
+    const key = `daftar-backup-nag:${user.id}`;
+    if (sessionStorage.getItem(key)) return;
+    setBackupOpen(true);
+  }, [hydrated, user.id]);
+
+  useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
     root.classList.toggle("light", theme === "light");
   }, [theme]);
 
+  const snapshot: NotesSnapshot = { pages, order, currentId, theme, expanded };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      const k = e.key.toLowerCase();
+      if (k === "k") {
         e.preventDefault();
         setSearch(true);
+        return;
+      }
+      const s = useNotes.getState();
+      const snap: NotesSnapshot = {
+        pages: s.pages,
+        order: s.order,
+        currentId: s.currentId,
+        theme: s.theme,
+        expanded: s.expanded,
+      };
+      if (k === "s") {
+        e.preventDefault();
+        void downloadJsonBackup(snap, user.username);
+      }
+      if (k === "p") {
+        e.preventDefault();
+        window.print();
+      }
+      if (k === "z") {
+        e.preventDefault();
+        if (e.shiftKey) s.redo();
+        else s.undo();
+      }
+      if (k === "y") {
+        e.preventDefault();
+        s.redo();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [user.username]);
 
   const page = pages[currentId];
+  const canUndo = histRev >= 0 && useNotes.getState().canUndo();
+  const canRedo = histRev >= 0 && useNotes.getState().canRedo();
 
   function convertMarkdownOnPage() {
     if (!page) return;
@@ -112,8 +164,7 @@ function NotesWorkspace({
   }
 
   function exportJson() {
-    const snap: NotesSnapshot = { pages, order, currentId, theme, expanded };
-    downloadText("daftar-backup.json", JSON.stringify(snap, null, 2), "application/json");
+    void downloadJsonBackup(snapshot, user.username);
   }
 
   function onImport(file: File) {
@@ -124,15 +175,32 @@ function NotesWorkspace({
         if (page) importMarkdown(page.id, raw);
         return;
       }
-      try {
-        const data = JSON.parse(raw) as NotesSnapshot;
-        importSnapshot(data);
-      } catch {
+      const parsed = parseBackupFile(raw);
+      if (!parsed) {
         if (page) importMarkdown(page.id, raw);
         else alert("فایل پشتیبان معتبر نیست.");
+        return;
       }
+      void (async () => {
+        if (parsed.images) {
+          await applyBackupImages({
+            kind: "daftar-backup",
+            version: 2,
+            savedAt: Date.now(),
+            user: user.username,
+            snapshot: parsed.snapshot,
+            images: parsed.images,
+          });
+        }
+        importSnapshot(parsed.snapshot);
+      })();
     };
     reader.readAsText(file);
+  }
+
+  function closeBackup() {
+    sessionStorage.setItem(`daftar-backup-nag:${user.id}`, "1");
+    setBackupOpen(false);
   }
 
   return (
@@ -142,6 +210,7 @@ function NotesWorkspace({
           onOpenSearch={() => setSearch(true)}
           userName={user.name}
           onLogout={onLogout}
+          onOpenPayloads={() => setPayloads(true)}
         />
       </div>
 
@@ -162,6 +231,10 @@ function NotesWorkspace({
               onClose={() => setMobileNav(false)}
               userName={user.name}
               onLogout={onLogout}
+              onOpenPayloads={() => {
+                setPayloads(true);
+                setMobileNav(false);
+              }}
             />
           </div>
         </div>
@@ -184,6 +257,26 @@ function NotesWorkspace({
           <Button
             variant="ghost"
             size="icon-sm"
+            onClick={() => undo()}
+            disabled={!canUndo}
+            aria-label="واگرد"
+            title="Ctrl+Z"
+          >
+            <Undo2 className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => redo()}
+            disabled={!canRedo}
+            aria-label="از نو"
+            title="Ctrl+Shift+Z"
+          >
+            <Redo2 className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             aria-label="تغییر پوسته"
           >
@@ -194,7 +287,7 @@ function NotesWorkspace({
               <Download className="size-4" />
             </Button>
             {menu ? (
-              <div className="absolute end-0 z-20 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+              <div className="absolute end-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 px-3 py-2 text-start text-[13px] hover:bg-surface-2"
@@ -204,7 +297,7 @@ function NotesWorkspace({
                   }}
                 >
                   <Download className="size-3.5" />
-                  خروجی Markdown
+                  خروجی Markdown این صفحه
                 </button>
                 <button
                   type="button"
@@ -227,6 +320,18 @@ function NotesWorkspace({
                 >
                   <FileJson className="size-3.5" />
                   پشتیبان JSON
+                  <kbd className="ms-auto font-mono text-[10px] text-subtle">Ctrl S</kbd>
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-start text-[13px] hover:bg-surface-2"
+                  onClick={() => {
+                    void downloadAllZip(snapshot, user.username);
+                    setMenu(false);
+                  }}
+                >
+                  <FileArchive className="size-3.5" />
+                  ZIP همهٔ صفحات
                 </button>
                 <button
                   type="button"
@@ -292,6 +397,8 @@ function NotesWorkspace({
       </div>
 
       <SearchDialog open={search} onOpenChange={setSearch} />
+      <PayloadPanel open={payloads} onClose={() => setPayloads(false)} />
+      <BackupPrompt userName={user.username} open={backupOpen} onClose={closeBackup} />
     </div>
   );
 }

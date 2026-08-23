@@ -1,16 +1,19 @@
 import {
   ChevronDown,
   ChevronLeft,
+  LayoutTemplate,
   LogOut,
   Plus,
   Search,
+  Terminal,
   Trash2,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type DragEvent } from "react";
 import { PageGlyph } from "@/components/page-icon";
 import { Button } from "@/components/ui/button";
 import { allTags, getChildren, useNotes } from "@/lib/notes/store";
+import { PAGE_TEMPLATES } from "@/lib/notes/templates";
 import type { Page } from "@/lib/notes/types";
 import { cn } from "@/lib/utils";
 
@@ -28,19 +31,61 @@ function PageRow({
   const toggleExpanded = useNotes((s) => s.toggleExpanded);
   const createPage = useNotes((s) => s.createPage);
   const deletePage = useNotes((s) => s.deletePage);
+  const movePage = useNotes((s) => s.movePage);
   const kids = getChildren(pages, page.id);
   const open = expanded[page.id] ?? false;
   const active = currentId === page.id;
+  const [over, setOver] = useState<"before" | "after" | "inside" | null>(null);
+
+  function onDragStart(e: DragEvent) {
+    e.dataTransfer.setData("text/plain", `daftar-page:${page.id}`);
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  function zoneFor(e: DragEvent): "before" | "after" | "inside" {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    if (y < rect.height * 0.28) return "before";
+    if (y > rect.height * 0.72) return "after";
+    return "inside";
+  }
+
+  function onDragOver(e: DragEvent) {
+    e.preventDefault();
+    setOver(zoneFor(e));
+  }
+
+  function onDrop(e: DragEvent) {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData("text/plain");
+    setOver(null);
+    if (!raw.startsWith("daftar-page:")) return;
+    const id = raw.slice("daftar-page:".length);
+    if (!id || id === page.id) return;
+    movePage(id, page.id, zoneFor(e));
+  }
 
   return (
     <div>
       <div
+        draggable
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragLeave={() => setOver(null)}
+        onDrop={onDrop}
         className={cn(
-          "group flex h-8 items-center rounded-md pe-1 text-[13px] transition-colors",
+          "group relative flex h-8 items-center rounded-md pe-1 text-[13px] transition-colors",
           active ? "bg-surface-2 text-fg" : "text-muted hover:bg-surface-2/70 hover:text-fg",
+          over === "inside" && "ring-1 ring-accent/50",
         )}
         style={{ paddingInlineStart: 8 + depth * 12 }}
       >
+        {over === "before" ? (
+          <span className="pointer-events-none absolute inset-x-2 top-0 h-px bg-accent" />
+        ) : null}
+        {over === "after" ? (
+          <span className="pointer-events-none absolute inset-x-2 bottom-0 h-px bg-accent" />
+        ) : null}
         {kids.length > 0 ? (
           <button
             type="button"
@@ -81,9 +126,7 @@ function PageRow({
         </button>
       </div>
       {open
-        ? kids.map((c) => (
-            <PageRow key={c.id} page={c} depth={depth + 1} />
-          ))
+        ? kids.map((c) => <PageRow key={c.id} page={c} depth={depth + 1} />)
         : null}
     </div>
   );
@@ -94,18 +137,22 @@ export function Sidebar({
   onClose,
   userName,
   onLogout,
+  onOpenPayloads,
 }: {
   onOpenSearch: () => void;
   onClose?: () => void;
   userName?: string;
   onLogout?: () => void;
+  onOpenPayloads?: () => void;
 }) {
   const pages = useNotes((s) => s.pages);
   const order = useNotes((s) => s.order);
   const filterTag = useNotes((s) => s.filterTag);
   const setFilterTag = useNotes((s) => s.setFilterTag);
   const createPage = useNotes((s) => s.createPage);
+  const createFromTemplate = useNotes((s) => s.createFromTemplate);
   const [tagQ, setTagQ] = useState("");
+  const [tplOpen, setTplOpen] = useState(false);
 
   const roots = useMemo(() => {
     const list = order.map((id) => pages[id]).filter(Boolean) as Page[];
@@ -145,6 +192,45 @@ export function Sidebar({
             Ctrl K
           </kbd>
         </button>
+        <div className="relative mt-1.5 grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setTplOpen((v) => !v)}
+            className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-surface-2 text-[12px] text-muted hover:text-fg"
+          >
+            <LayoutTemplate className="size-3.5" />
+            قالب‌ها
+          </button>
+          <button
+            type="button"
+            onClick={onOpenPayloads}
+            className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-surface-2 text-[12px] text-muted hover:text-fg"
+          >
+            <Terminal className="size-3.5" />
+            Payload
+          </button>
+          {tplOpen ? (
+            <div className="absolute start-0 top-9 z-20 w-[240px] overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+              {PAGE_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  className="flex w-full items-start gap-2 px-3 py-2 text-start hover:bg-surface-2"
+                  onClick={() => {
+                    createFromTemplate(tpl);
+                    setTplOpen(false);
+                  }}
+                >
+                  <PageGlyph name={tpl.icon} className="mt-0.5 size-3.5 text-muted" />
+                  <span>
+                    <span className="block text-[13px]">{tpl.title}</span>
+                    <span className="block text-[11px] text-subtle">{tpl.hint}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">

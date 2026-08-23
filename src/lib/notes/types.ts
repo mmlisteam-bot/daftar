@@ -58,6 +58,7 @@ export type Page = {
   blocks: Block[];
   createdAt: number;
   updatedAt: number;
+  sort?: number;
 };
 
 export type NotesSnapshot = {
@@ -105,6 +106,7 @@ export function emptyPage(partial?: Partial<Page>): Page {
     blocks: [emptyBlock("p")],
     createdAt: now,
     updatedAt: now,
+    sort: now,
     ...partial,
   };
 }

@@ -455,6 +455,8 @@ function BlockView({
   const replaceBlock = useNotes((s) => s.replaceBlock);
   const removeBlock = useNotes((s) => s.removeBlock);
   const moveBlock = useNotes((s) => s.moveBlock);
+  const reorderBlocks = useNotes((s) => s.reorderBlocks);
+  const [dropOver, setDropOver] = useState(false);
 
   function onText(content: string) {
     if (block.type === "p") {
@@ -498,7 +500,28 @@ function BlockView({
     block.type === "h1" ? "تیتر" : block.type === "p" ? "بنویس، پیست کن یا / بزن" : " ";
 
   const shell = (child: ReactNode) => (
-    <div className="group relative flex items-start gap-1" data-block={block.id}>
+    <div
+      className={cn(
+        "group relative flex items-start gap-1 rounded-md",
+        dropOver && "bg-surface-2/80 ring-1 ring-accent/40",
+      )}
+      data-block={block.id}
+      onDragOver={(e: DragEvent) => {
+        if (!e.dataTransfer.types.includes("text/plain") && !e.dataTransfer.types.includes("text")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDropOver(true);
+      }}
+      onDragLeave={() => setDropOver(false)}
+      onDrop={(e: DragEvent) => {
+        const raw = e.dataTransfer.getData("text/plain");
+        if (!raw.startsWith("daftar-block:")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDropOver(false);
+        reorderBlocks(pageId, raw.slice("daftar-block:".length), block.id);
+      }}
+    >
       <div className="no-print mt-1 flex w-8 shrink-0 justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         <button
           type="button"
@@ -510,9 +533,14 @@ function BlockView({
         </button>
         <button
           type="button"
-          className="flex size-6 items-center justify-center rounded text-subtle hover:bg-surface-2"
+          draggable
+          className="flex size-6 cursor-grab items-center justify-center rounded text-subtle hover:bg-surface-2 active:cursor-grabbing"
           onClick={() => moveBlock(pageId, block.id, -1)}
-          title="جابه‌جایی"
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/plain", `daftar-block:${block.id}`);
+            e.dataTransfer.effectAllowed = "move";
+          }}
+          title="بکش برای جابه‌جایی · کلیک: یکی بالا"
         >
           <GripVertical className="size-3.5" />
         </button>
