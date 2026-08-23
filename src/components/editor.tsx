@@ -66,9 +66,11 @@ const CALLOUT_LABEL: Record<CalloutKind, string> = {
 function NewBlockChooser({
   onPick,
   onClose,
+  placement = "handle",
 }: {
   onPick: (type: "p" | "code") => void;
   onClose: () => void;
+  placement?: "handle" | "below";
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -88,7 +90,10 @@ function NewBlockChooser({
   return (
     <div
       ref={ref}
-      className="absolute start-7 top-7 z-30 w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg"
+      className={cn(
+        "absolute z-30 w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg",
+        placement === "below" ? "start-0 top-full mt-1" : "start-full top-0 ms-1",
+      )}
     >
       <button
         type="button"
@@ -968,6 +973,7 @@ export function Editor() {
           </Button>
           {addOpen ? (
             <NewBlockChooser
+              placement="below"
               onPick={(type) => {
                 insertBlock(page.id, page.blocks.at(-1)?.id ?? null, type);
                 setAddOpen(false);
