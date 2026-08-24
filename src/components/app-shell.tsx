@@ -242,7 +242,7 @@ function NotesWorkspace({
 
   return (
     <div className="flex h-dvh min-h-0 bg-bg text-fg">
-      <div className="no-print hidden h-full w-[272px] shrink-0 border-e border-border md:block">
+      <div className="no-print hidden h-full w-[300px] shrink-0 border-e border-border md:block">
         <Sidebar
           onOpenSearch={() => setSearch(true)}
           userName={user.name}

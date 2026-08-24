@@ -108,8 +108,7 @@ function PageRow({
   }
 
   const actions = cn(
-    "flex size-6 items-center justify-center rounded",
-    compact ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+    "flex size-6 items-center justify-center rounded hover:bg-bg",
   );
 
   return (
@@ -117,7 +116,7 @@ function PageRow({
       <div
         draggable={!compact}
         data-page-id={page.id}
-        title={compact ? undefined : "بکش و روی صفحهٔ دیگر رها کن تا زیرمجموعه‌اش شود"}
+        title={page.title || "بدون عنوان"}
         onDragStart={onDragStart}
         onDragEnd={() => {
           setDragging(false);
@@ -127,15 +126,15 @@ function PageRow({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
-          "group relative flex items-center rounded-md pe-0.5 text-[15px] transition-colors",
+          "group relative flex items-start rounded-md pe-1 text-[15px] leading-snug transition-colors",
           !compact && "cursor-grab active:cursor-grabbing",
-          compact ? "h-10" : "h-9",
+          compact ? "min-h-10 py-1.5" : "min-h-9 py-1",
           active ? "bg-surface-2 text-fg" : "text-muted hover:bg-surface-2/70 hover:text-fg",
           dragging && "opacity-40",
           over === "inside" && "bg-accent/15 ring-1 ring-accent/60",
           over && "[&_button]:pointer-events-none",
         )}
-        style={{ paddingInlineStart: 6 + depth * (compact ? 8 : 12) }}
+        style={{ paddingInlineStart: 4 + depth * (compact ? 8 : 10) }}
       >
         {over === "before" ? (
           <span className="pointer-events-none absolute inset-x-2 top-0 h-0.5 rounded-full bg-accent" />
@@ -149,65 +148,66 @@ function PageRow({
         {kids.length > 0 ? (
           <button
             type="button"
-            className="flex size-6 shrink-0 items-center justify-center rounded text-subtle"
+            className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded text-subtle"
             onClick={() => toggleExpanded(page.id)}
             aria-label={open ? "بستن" : "باز کردن"}
           >
             {open ? <ChevronDown className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
           </button>
         ) : (
-          <span className="size-6 shrink-0" />
+          <span className="mt-0.5 size-6 shrink-0" />
         )}
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 text-start"
+          className="flex min-w-0 flex-1 items-start gap-1.5 pe-1 text-start"
           onClick={() => {
             setCurrent(page.id);
             onNavigate?.();
           }}
         >
-          <PageGlyph name={page.icon} className="size-3.5 opacity-80" />
-          <span className="truncate">{page.title || "بدون عنوان"}</span>
+          <PageGlyph name={page.icon} className="mt-0.5 size-3.5 shrink-0 opacity-80" />
+          <span className="min-w-0 flex-1 whitespace-normal break-words">
+            {page.title || "بدون عنوان"}
+          </span>
         </button>
-        <button
-          type="button"
+        <div
           className={cn(
-            "flex size-6 items-center justify-center rounded",
-            page.starred ? "text-warn opacity-100" : cn(actions, "hover:text-warn"),
+            "absolute end-0.5 top-1 z-10 hidden items-center rounded-md bg-surface/95 shadow-sm group-hover:flex",
+            compact && "flex bg-transparent shadow-none",
           )}
-          title={page.starred ? "حذف از محبوب‌ها" : "محبوب"}
-          onClick={() => toggleStar(page.id)}
         >
-          <Star className="size-3.5" fill={page.starred ? "currentColor" : "none"} />
-        </button>
-        <button
-          type="button"
-          className={cn(actions, "hover:bg-bg")}
-          title="کپی صفحه"
-          onClick={() => duplicatePage(page.id)}
-        >
-          <Copy className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          className={cn(actions, "hover:bg-bg")}
-          title="زیرصفحه"
-          onClick={() => createPage({ parentId: page.id })}
-        >
-          <Plus className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          className={cn(actions, "hover:bg-bg hover:text-danger")}
-          title="حذف"
-          onClick={() => {
-            if (confirm(`«${page.title || "بدون عنوان"}» به سطل زباله برود؟ تا ۷ روز قابل برگشت است.`)) {
-              deletePage(page.id);
-            }
-          }}
-        >
-          <Trash2 className="size-3.5" />
-        </button>
+          <button
+            type="button"
+            className={cn(actions, page.starred ? "text-warn" : "hover:text-warn")}
+            title={page.starred ? "حذف از محبوب‌ها" : "محبوب"}
+            onClick={() => toggleStar(page.id)}
+          >
+            <Star className="size-3.5" fill={page.starred ? "currentColor" : "none"} />
+          </button>
+          <button type="button" className={actions} title="کپی صفحه" onClick={() => duplicatePage(page.id)}>
+            <Copy className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            className={actions}
+            title="زیرصفحه"
+            onClick={() => createPage({ parentId: page.id })}
+          >
+            <Plus className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            className={cn(actions, "hover:text-danger")}
+            title="حذف"
+            onClick={() => {
+              if (confirm(`«${page.title || "بدون عنوان"}» به سطل زباله برود؟ تا ۷ روز قابل برگشت است.`)) {
+                deletePage(page.id);
+              }
+            }}
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
       </div>
       {open
         ? kids.map((c) => (
@@ -409,11 +409,11 @@ export function Sidebar({
                   setCurrent(p.id);
                   onClose?.();
                 }}
-                className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-[15px] text-muted hover:bg-surface-2 hover:text-fg"
+                className="flex min-h-9 w-full items-start gap-2 rounded-md px-2 py-1.5 text-[15px] leading-snug text-muted hover:bg-surface-2 hover:text-fg"
               >
-                <Star className="size-3.5 shrink-0 text-warn" fill="currentColor" />
-                <PageGlyph name={p.icon} className="size-3.5 opacity-80" />
-                <span className="truncate">{p.title || "بدون عنوان"}</span>
+                <Star className="mt-0.5 size-3.5 shrink-0 text-warn" fill="currentColor" />
+                <PageGlyph name={p.icon} className="mt-0.5 size-3.5 shrink-0 opacity-80" />
+                <span className="min-w-0 flex-1 whitespace-normal break-words">{p.title || "بدون عنوان"}</span>
               </button>
             ))}
           </div>
@@ -430,11 +430,11 @@ export function Sidebar({
                   setCurrent(p.id);
                   onClose?.();
                 }}
-                className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-[15px] text-muted hover:bg-surface-2 hover:text-fg"
+                className="flex min-h-9 w-full items-start gap-2 rounded-md px-2 py-1.5 text-[15px] leading-snug text-muted hover:bg-surface-2 hover:text-fg"
               >
-                <History className="size-3.5 shrink-0" />
-                <PageGlyph name={p.icon} className="size-3.5 opacity-80" />
-                <span className="truncate">{p.title || "بدون عنوان"}</span>
+                <History className="mt-0.5 size-3.5 shrink-0" />
+                <PageGlyph name={p.icon} className="mt-0.5 size-3.5 shrink-0 opacity-80" />
+                <span className="min-w-0 flex-1 whitespace-normal break-words">{p.title || "بدون عنوان"}</span>
               </button>
             ))}
           </div>
