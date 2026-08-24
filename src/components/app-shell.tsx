@@ -129,6 +129,14 @@ function NotesWorkspace({
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
     root.classList.toggle("light", theme === "light");
+    const color = theme === "light" ? "#efe8dc" : "#131210";
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.setAttribute("name", "theme-color");
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", color);
   }, [theme]);
 
   const snapshot: NotesSnapshot = { pages, order, currentId, theme, expanded, trash, recentIds: useNotes.getState().recentIds };

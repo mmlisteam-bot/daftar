@@ -30,45 +30,45 @@
 
 :root,
 .light {
-  --bg: #f3f0e8;
-  --surface: #fbf9f4;
-  --surface-2: #ebe6dc;
-  --fg: #1c1b18;
-  --muted: #6a675f;
-  --subtle: #8f8b82;
-  --border: color-mix(in oklab, var(--fg) 12%, transparent);
-  --accent: #3d4450;
-  --accent-fg: #fbf9f4;
+  --bg: #efe8dc;
+  --surface: #f7f1e6;
+  --surface-2: #e8ddd0;
+  --fg: #1b1914;
+  --muted: #6a6358;
+  --subtle: #92897c;
+  --border: color-mix(in oklab, var(--fg) 11%, transparent);
+  --accent: #1e6b63;
+  --accent-fg: #f4f1ea;
   --danger: #b42318;
-  --info: #3d5a73;
-  --warn: #8a5a18;
-  --ok: #3d6b4f;
-  --syn-kw: #c2255c;
-  --syn-str: #2b8a3e;
-  --syn-cm: #868e96;
-  --syn-num: #364fc7;
-  --code-bg: #f4f1ea;
+  --info: #2c5d7a;
+  --warn: #9a5b12;
+  --ok: #2f6a45;
+  --syn-kw: #b31d4a;
+  --syn-str: #1f7a3a;
+  --syn-cm: #8a8378;
+  --syn-num: #2f4fbf;
+  --code-bg: #efe6d4;
 }
 
 .dark {
-  --bg: #0c0d0f;
-  --surface: #141518;
-  --surface-2: #1c1e22;
-  --fg: #eceae6;
-  --muted: #8c8c88;
-  --subtle: #5c5c58;
+  --bg: #131210;
+  --surface: #1c1a17;
+  --surface-2: #27241f;
+  --fg: #f1ece4;
+  --muted: #a39a8d;
+  --subtle: #6f685d;
   --border: color-mix(in oklab, var(--fg) 12%, transparent);
-  --accent: #c8ccd4;
-  --accent-fg: #0c0d0f;
-  --danger: #e07a72;
-  --info: #8aa4bb;
-  --warn: #c4a36a;
-  --ok: #8fba9c;
+  --accent: #6ec4b8;
+  --accent-fg: #10211f;
+  --danger: #e88980;
+  --info: #8fb4cc;
+  --warn: #d4b07a;
+  --ok: #8fbf9d;
   --syn-kw: #e391b0;
-  --syn-str: #8fba9c;
-  --syn-cm: #6b6b67;
+  --syn-str: #8fbf9d;
+  --syn-cm: #6e675c;
   --syn-num: #9db4e0;
-  --code-bg: #16181c;
+  --code-bg: #181613;
 }
 
 @layer base {
@@ -109,6 +109,10 @@
     text-wrap: pretty;
   }
 
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 28%, transparent);
+  }
+
   :lang(en),
   [dir="ltr"] {
     font-feature-settings: "kern" 1;
@@ -137,9 +141,9 @@
 
 .wiki-link {
   display: inline;
-  color: var(--info);
-  border-bottom: 1px dashed color-mix(in oklab, var(--info) 50%, transparent);
-  background: color-mix(in oklab, var(--info) 8%, transparent);
+  color: var(--accent);
+  border-bottom: 1px dashed color-mix(in oklab, var(--accent) 55%, transparent);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
   border-radius: 2px;
   padding-inline: 2px;
 }
