@@ -127,9 +127,9 @@ function PageRow({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
-          "group relative flex items-center rounded-md pe-0.5 text-[13px] transition-colors",
+          "group relative flex items-center rounded-md pe-0.5 text-[15px] transition-colors",
           !compact && "cursor-grab active:cursor-grabbing",
-          compact ? "h-9" : "h-8",
+          compact ? "h-10" : "h-9",
           active ? "bg-surface-2 text-fg" : "text-muted hover:bg-surface-2/70 hover:text-fg",
           dragging && "opacity-40",
           over === "inside" && "bg-accent/15 ring-1 ring-accent/60",
@@ -328,9 +328,9 @@ export function Sidebar({
     <aside className="flex h-full min-h-0 w-full flex-col bg-surface">
       <div className={cn("flex items-center justify-between gap-2 px-3", compact ? "pt-3 pb-1" : "pt-4 pb-2")}>
         <div className="min-w-0">
-          <div className="text-[15px] font-semibold tracking-tight">Daftar</div>
+          <div className="text-[17px] font-semibold tracking-tight">Daftar</div>
           <div className="flex items-center gap-1.5">
-            <div className="truncate text-[11px] text-muted">{userName ?? "جزوه پنتست وب"}</div>
+            <div className="truncate text-[13px] text-muted">{userName ?? "جزوه پنتست وب"}</div>
             {heart ? (
               <Heart className="hadis-heart size-3.5 shrink-0" fill="currentColor" aria-hidden />
             ) : null}
@@ -347,7 +347,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onOpenSearch}
-          className="flex h-9 w-full items-center gap-2 rounded-md border border-border bg-bg px-2.5 text-start text-[13px] text-muted"
+          className="flex h-10 w-full items-center gap-2 rounded-md border border-border bg-bg px-2.5 text-start text-[15px] text-muted"
         >
           <Search className="size-3.5" />
           جستجو
@@ -359,7 +359,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={() => setTplOpen((v) => !v)}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-surface-2 text-[12px] text-muted hover:text-fg"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-surface-2 text-[14px] text-muted hover:text-fg"
           >
             <LayoutTemplate className="size-3.5" />
             قالب‌ها
@@ -367,7 +367,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onOpenPayloads}
-            className="flex h-8 items-center justify-center gap-1.5 rounded-md bg-surface-2 text-[12px] text-muted hover:text-fg"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-surface-2 text-[14px] text-muted hover:text-fg"
           >
             <Terminal className="size-3.5" />
             Payload
@@ -400,7 +400,7 @@ export function Sidebar({
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
         {starred.length > 0 ? (
           <div className="mb-3">
-            <div className="mb-1 px-1 text-[11px] font-medium text-subtle">محبوب‌ها</div>
+            <div className="mb-1 px-1 text-[13px] font-medium text-subtle">محبوب‌ها</div>
             {starred.map((p) => (
               <button
                 key={p.id}
@@ -409,7 +409,7 @@ export function Sidebar({
                   setCurrent(p.id);
                   onClose?.();
                 }}
-                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] text-muted hover:bg-surface-2 hover:text-fg"
+                className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-[15px] text-muted hover:bg-surface-2 hover:text-fg"
               >
                 <Star className="size-3.5 shrink-0 text-warn" fill="currentColor" />
                 <PageGlyph name={p.icon} className="size-3.5 opacity-80" />
@@ -421,7 +421,7 @@ export function Sidebar({
 
         {recents.length > 0 ? (
           <div className="mb-3">
-            <div className="mb-1 px-1 text-[11px] font-medium text-subtle">اخیر</div>
+            <div className="mb-1 px-1 text-[13px] font-medium text-subtle">اخیر</div>
             {recents.map((p) => (
               <button
                 key={`r-${p.id}`}
@@ -430,7 +430,7 @@ export function Sidebar({
                   setCurrent(p.id);
                   onClose?.();
                 }}
-                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] text-muted hover:bg-surface-2 hover:text-fg"
+                className="flex h-9 w-full items-center gap-2 rounded-md px-2 text-[15px] text-muted hover:bg-surface-2 hover:text-fg"
               >
                 <History className="size-3.5 shrink-0" />
                 <PageGlyph name={p.icon} className="size-3.5 opacity-80" />
@@ -458,7 +458,7 @@ export function Sidebar({
             if (id) movePage(id, null, "root");
           }}
         >
-          <span className="text-[11px] font-medium text-subtle">صفحات</span>
+          <span className="text-[13px] font-medium text-subtle">صفحات</span>
           <button
             type="button"
             className="flex size-6 items-center justify-center rounded-md text-muted hover:bg-surface-2"
@@ -472,12 +472,12 @@ export function Sidebar({
           <PageRow key={p.id} page={p} depth={0} compact={compact} onNavigate={onClose} />
         ))}
 
-        <div className="mt-5 px-1 text-[11px] font-medium text-subtle">تگ‌ها</div>
+        <div className="mt-5 px-1 text-[13px] font-medium text-subtle">تگ‌ها</div>
         <input
           value={tagQ}
           onChange={(e) => setTagQ(e.target.value)}
           placeholder="فیلتر تگ · صفحه را روی تگ رها کن"
-          className="mt-1 mb-1.5 h-8 w-full rounded-md border border-border bg-bg px-2 text-[12px] outline-none placeholder:text-subtle"
+          className="mt-1 mb-1.5 h-9 w-full rounded-md border border-border bg-bg px-2 text-[14px] outline-none placeholder:text-subtle"
         />
         <div className="flex flex-wrap gap-1 px-0.5">
           {tags.map(({ tag, count }) => {
@@ -498,7 +498,7 @@ export function Sidebar({
                   if (id) addTag(id, tag);
                 }}
                 className={cn(
-                  "rounded-full px-2 py-1 text-[11px] transition-colors",
+                  "rounded-full px-2.5 py-1 text-[13px] transition-colors",
                   on ? "bg-accent text-accent-fg" : "bg-surface-2 text-muted hover:text-fg",
                 )}
               >
@@ -521,7 +521,7 @@ export function Sidebar({
         <div className="mt-5">
           <button
             type="button"
-            className="flex h-8 w-full items-center gap-2 rounded-md px-1 text-[11px] font-medium text-subtle hover:text-fg"
+            className="flex h-9 w-full items-center gap-2 rounded-md px-1 text-[13px] font-medium text-subtle hover:text-fg"
             onClick={() => setTrashOpen((v) => !v)}
           >
             <Trash2 className="size-3.5" />
@@ -572,7 +572,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onLogout}
-            className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-[13px] text-muted hover:bg-surface-2 hover:text-fg"
+            className="flex h-10 w-full items-center gap-2 rounded-md px-2.5 text-[15px] text-muted hover:bg-surface-2 hover:text-fg"
           >
             <LogOut className="size-3.5" />
             خروج

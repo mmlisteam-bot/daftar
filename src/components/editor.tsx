@@ -459,7 +459,7 @@ function CodeBlockView({
             if (block.content.trim()) setEditing(false);
           }}
           onPaste={(e) => void pasteInto(e, pageId, block, { allowStructured: false })}
-          className="min-h-24 w-full resize-y bg-transparent px-3 pb-3 font-mono text-[13px] leading-relaxed text-fg outline-none"
+          className="min-h-24 w-full resize-y bg-transparent px-3 pb-3 font-mono text-[14px] leading-relaxed text-fg outline-none"
         />
       ) : (
         <button type="button" className="block w-full text-start" onClick={() => setEditing(true)}>
@@ -525,7 +525,7 @@ function TableBlockView({
   }
   return (
     <div className="overflow-x-auto rounded-md border border-border">
-      <table className="note-table w-full min-w-[280px] text-[13px]">
+      <table className="note-table w-full min-w-[280px] text-[15px] leading-7">
         <thead>
           <tr>
             {headers.map((h, i) => (
@@ -871,14 +871,14 @@ function BlockView({
     block.type === "h1"
       ? "text-[32px] font-semibold leading-tight tracking-tight"
       : block.type === "h2"
-        ? "text-[22px] font-semibold leading-snug"
+        ? "text-[24px] font-semibold leading-snug"
         : block.type === "h3"
-          ? "text-[17px] font-semibold"
+          ? "text-[18px] font-semibold"
           : block.type === "quote"
-            ? "border-s-2 border-fg/30 ps-3 text-muted italic"
+            ? "border-s-2 border-fg/30 ps-3 text-[16px] leading-[1.75] text-muted italic"
             : block.type === "callout"
               ? cn(
-                  "rounded-md border px-3 py-2 text-sm",
+                  "rounded-md border px-3 py-2.5 text-[16px] leading-[1.75]",
                   block.callout === "warning"
                     ? "border-warn/40 bg-warn/8"
                     : block.callout === "tip" || block.callout === "example"
@@ -887,7 +887,7 @@ function BlockView({
                         ? "border-danger/40 bg-danger/8"
                         : "border-info/40 bg-info/8",
                 )
-              : "text-[15px] leading-7";
+              : "text-[16px] leading-[1.75]";
 
   const prefix =
     block.type === "ul" ? (
@@ -979,14 +979,14 @@ function PageToc({ page }: { page: Page }) {
   if (heads.length < 3) return null;
   return (
     <nav className="no-print mb-6 rounded-lg border border-border bg-surface px-3 py-2.5">
-      <div className="mb-1.5 text-[11px] font-medium text-subtle">فهرست مطالب</div>
+      <div className="mb-1.5 text-[13px] font-medium text-subtle">فهرست مطالب</div>
       <div className="flex flex-col gap-0.5">
         {heads.map((h) => (
           <button
             key={h.id}
             type="button"
             className={cn(
-              "truncate text-start text-[13px] text-muted hover:text-fg",
+              "truncate text-start text-[15px] text-muted hover:text-fg",
               h.type === "h2" && "ps-3",
               h.type === "h3" && "ps-6 text-[12px]",
             )}
@@ -1012,7 +1012,7 @@ function LabProgress({ page }: { page: Page }) {
   const pct = Math.round((done / total) * 100);
   return (
     <div className="no-print mb-5">
-      <div className="mb-1 flex justify-between text-[11px] text-muted">
+      <div className="mb-1 flex justify-between text-[13px] text-muted">
         <span>پیشرفت لاب</span>
         <span>
           {done} از {total} · {pct}٪
@@ -1107,7 +1107,7 @@ export function Editor() {
       }}
       onDrop={onDropMd}
     >
-      <div className="no-print mb-4 flex flex-wrap items-center gap-1 text-[12px] text-muted">
+      <div className="no-print mb-4 flex flex-wrap items-center gap-1 text-[14px] text-muted">
         {crumbs.map((c, i) => (
           <span key={c.id} className="flex items-center gap-1">
             {i > 0 ? <span className="text-subtle">/</span> : null}

@@ -291,7 +291,7 @@ function NotesWorkspace({
           >
             <Menu className="size-4" />
           </Button>
-          <div className="min-w-0 flex-1 truncate px-2 text-[13px] text-muted">
+          <div className="min-w-0 flex-1 truncate px-2 text-[15px] text-muted">
             {page?.title ?? ""}
           </div>
           <Button

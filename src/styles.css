@@ -4,7 +4,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Vazirmatn", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Vazirmatn", "Inter", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --color-bg: var(--bg);
@@ -91,7 +91,9 @@
 
   body {
     font-family: var(--font-sans);
-    line-height: 1.55;
+    font-size: 16px;
+    line-height: 1.75;
+    font-feature-settings: "kern" 1, "ss01" 1;
   }
 
   button:not(:disabled),
@@ -157,8 +159,8 @@
   padding: 12px 14px;
   overflow-x: auto;
   font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 14px;
+  line-height: 1.7;
   text-align: left;
   white-space: pre;
 }

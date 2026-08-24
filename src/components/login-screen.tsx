@@ -39,35 +39,35 @@ export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => v
             <BookOpen className="size-5" strokeWidth={1.75} />
           </div>
           <div>
-            <div className="text-[17px] font-semibold tracking-tight">Daftar</div>
-            <div className="text-[12px] text-muted">ورود به دفتر جزوه</div>
+            <div className="text-[20px] font-semibold tracking-tight">Daftar</div>
+            <div className="text-[14px] text-muted">ورود به دفتر جزوه</div>
           </div>
         </div>
 
         <label className="mb-3 block">
-          <span className="mb-1.5 block text-[12px] text-muted">نام کاربری</span>
+          <span className="mb-1.5 block text-[14px] text-muted">نام کاربری</span>
           <input
             dir="ltr"
             autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="h-10 w-full rounded-md border border-border bg-bg px-3 font-mono text-[13px] outline-none focus:ring-2 focus:ring-accent/40"
+            className="h-11 w-full rounded-md border border-border bg-bg px-3 font-mono text-[15px] outline-none focus:ring-2 focus:ring-accent/40"
           />
         </label>
 
         <label className="mb-3 block">
-          <span className="mb-1.5 block text-[12px] text-muted">رمز عبور</span>
+          <span className="mb-1.5 block text-[14px] text-muted">رمز عبور</span>
           <input
             dir="ltr"
             type="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="h-10 w-full rounded-md border border-border bg-bg px-3 font-mono text-[13px] outline-none focus:ring-2 focus:ring-accent/40"
+            className="h-11 w-full rounded-md border border-border bg-bg px-3 font-mono text-[15px] outline-none focus:ring-2 focus:ring-accent/40"
           />
         </label>
 
-        <label className="mb-4 flex cursor-pointer select-none items-center gap-2 text-[13px] text-fg">
+        <label className="mb-4 flex cursor-pointer select-none items-center gap-2 text-[15px] text-fg">
           <input
             type="checkbox"
             checked={remember}
@@ -77,14 +77,14 @@ export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => v
           مرا به خاطر بسپار
         </label>
 
-        {error ? <p className="mb-3 text-[13px] text-danger">{error}</p> : null}
+        {error ? <p className="mb-3 text-[15px] text-danger">{error}</p> : null}
 
         <Button type="submit" className="w-full" disabled={busy}>
           <Lock className="size-3.5" />
           {busy ? "در حال ورود…" : "ورود"}
         </Button>
 
-        <p className="mt-4 text-[11px] leading-5 text-subtle">
+        <p className="mt-4 text-[13px] leading-6 text-subtle">
           اگر تیک را بزنی، تا وقتی خروج نزنی دوباره لاگین نمی‌خواهد.
         </p>
       </form>
