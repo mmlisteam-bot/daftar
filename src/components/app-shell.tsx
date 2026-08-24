@@ -25,6 +25,7 @@ import { SearchDialog } from "@/components/search-dialog";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 import { applyBackupImages, downloadAllZip, downloadJsonBackup, parseBackupFile } from "@/lib/notes/backup";
+import { SQLI_EXPAND, SQLI_REF_FLAG, applySqliRef } from "@/lib/notes/sqli-ref";
 import { downloadText, pageToMarkdown, blockToMarkdown } from "@/lib/notes/markdown";
 import { getSession, logout, markHadisHelloSeen, setActiveUserId, shouldShowHadisHello, type SessionUser } from "@/lib/notes/session";
 import { useNotes } from "@/lib/notes/store";
@@ -93,14 +94,26 @@ function NotesWorkspace({
     primeWorkspace();
     const done = () => setHydrated(true);
     const maybe = useNotes.persist.rehydrate();
-    if (maybe && typeof (maybe as Promise<void>).then === "function") {
-      void (maybe as Promise<void>).then(() => {
-        useNotes.getState().purgeTrash();
-        done();
-      }, done);
-    } else {
+    const inject = () => {
       useNotes.getState().purgeTrash();
+      if (user.id === "mmli") {
+        const s = useNotes.getState();
+        const next = localStorage.getItem(SQLI_REF_FLAG)
+          ? { pages: s.pages, order: s.order, expanded: { ...s.expanded, ...SQLI_EXPAND } }
+          : applySqliRef(s.pages, s.order, s.expanded);
+        useNotes.setState({
+          pages: next.pages,
+          order: next.order,
+          expanded: next.expanded,
+        });
+        localStorage.setItem(SQLI_REF_FLAG, "1");
+      }
       done();
+    };
+    if (maybe && typeof (maybe as Promise<void>).then === "function") {
+      void (maybe as Promise<void>).then(inject, inject);
+    } else {
+      inject();
     }
   }, [setHydrated, primeWorkspace]);
 

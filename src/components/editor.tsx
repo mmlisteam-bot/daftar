@@ -151,9 +151,18 @@ function applyMarkdownShortcut(text: string): Partial<Block> | null {
 }
 
 function jumpWiki(pageId: string, target: string) {
-  const page = useNotes.getState().pages[pageId];
-  if (!page) return;
+  const store = useNotes.getState();
   const needle = headingAnchor(target);
+  const byTitle = Object.values(store.pages).find((p) => {
+    const t = headingAnchor(p.title);
+    return t === needle || t.includes(needle) || needle.includes(t);
+  });
+  if (byTitle) {
+    store.setCurrent(byTitle.id);
+    return;
+  }
+  const page = store.pages[pageId];
+  if (!page) return;
   const hit = page.blocks.find(
     (b) =>
       (b.type === "h1" || b.type === "h2" || b.type === "h3") &&

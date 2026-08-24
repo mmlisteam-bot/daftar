@@ -1,4 +1,5 @@
 import { PAGE } from "./ids";
+import { createSqliRefPages } from "./sqli-ref";
 import type { Block, BlockType, Page } from "./types";
 
 let seq = 0;
@@ -55,7 +56,7 @@ export function createSeed(): { pages: Record<string, Page>; order: string[] } {
       blk("h2", "نمونه ساختار کلاس"),
       blk(
         "p",
-        "جزوه HTTP و چهار مدل SQL Injection از قبل به‌صورت صفحه و زیرصفحه آمده‌اند. روی تگ SQL Injection در سایدبار کلیک کن تا فقط همان خانواده دیده شود.",
+        "جزوه HTTP و مرجع کامل «SQL Injection صفر تا صد» به‌صورت صفحه و زیرصفحه آمده‌اند. از محبوب‌ها یا تگ SQL Injection وارد مرجع شو.",
       ),
     ],
   );
@@ -190,105 +191,7 @@ export function createSeed(): { pages: Record<string, Page>; order: string[] } {
     ],
   );
 
-  pages[PAGE.sqli] = page(
-    PAGE.sqli,
-    "SQL Injection",
-    "database",
-    ["SQL Injection", "Injection"],
-    null,
-    [
-      blk("h1", "SQL Injection"),
-      blk(
-        "p",
-        "تزریق SQL وقتی رخ می‌دهد که ورودی کاربر بدون تفکیک به پرس‌وجوی پایگاه‌داده وصل شود. روی تگ SQL Injection کلیک کن یا از کارت‌های زیرصفحه وارد هر مدل شو.",
-      ),
-      blk("callout", "چهار مدل کلاسیکی که معمولاً در کلاس پوشش داده می‌شود پایین به‌صورت زیرصفحه آمده است.", {
-        callout: "info",
-      }),
-      blk("toggle", "علائم اولیه", {
-        open: true,
-        inner:
-          "خطای دیتابیس در پاسخ، رفتار متفاوت با ' و \"، تأخیر زمانی با SLEEP، یا داده‌ای که نباید دیده شود.",
-      }),
-      blk("h2", "نقطه ورود رایج"),
-      blk("ul", "پارامترهای Query String و فرم"),
-      blk("ul", "Headerهایی مثل User-Agent و Cookie"),
-      blk("ul", "JSON body در API"),
-    ],
-  );
-
-  pages[PAGE.sqliUnion] = page(
-    PAGE.sqliUnion,
-    "Union-based",
-    "database",
-    ["SQL Injection", "Union"],
-    PAGE.sqli,
-    [
-      blk("h1", "Union-based SQL Injection"),
-      blk(
-        "p",
-        "وقتی نتیجه پرس‌وجو در صفحه دیده می‌شود، می‌توان با UNION SELECT ستون‌های اضافی را به خروجی چسباند.",
-      ),
-      blk("h2", "ایده"),
-      blk("ul", "تعداد ستون‌های پرس‌وجوی اصلی را پیدا کن (ORDER BY یا UNION NULL)."),
-      blk("ul", "ستون‌هایی که در صفحه چاپ می‌شوند را مشخص کن."),
-      blk("ul", "به‌جای آن ستون‌ها دادهٔ مورد نظر را انتخاب کن."),
-      blk("callout", "اسکرین‌شات پاسخ سرور را همین‌جا در یک بلاک تصویر بگذار تا بعداً مسیر تست را از دست ندهی.", {
-        callout: "tip",
-      }),
-    ],
-  );
-
-  pages[PAGE.sqliError] = page(
-    PAGE.sqliError,
-    "Error-based",
-    "bug",
-    ["SQL Injection", "Error"],
-    PAGE.sqli,
-    [
-      blk("h1", "Error-based SQL Injection"),
-      blk(
-        "p",
-        "اگر دیتابیس خطا را در پاسخ برگرداند، می‌توان با توابعی که خطا می‌سازند داده را از داخل پیام خطا خواند.",
-      ),
-      blk("callout", "۵۰۰ و پیام خام دیتابیس هم Information Leakage است و هم کانال استخراج.", {
-        callout: "warning",
-      }),
-    ],
-  );
-
-  pages[PAGE.sqliBoolean] = page(
-    PAGE.sqliBoolean,
-    "Boolean-based Blind",
-    "shield",
-    ["SQL Injection", "Blind"],
-    PAGE.sqli,
-    [
-      blk("h1", "Boolean-based Blind"),
-      blk(
-        "p",
-        "وقتی خروجی مستقیم نیست، از تفاوت پاسخ True/False (محتوا، طول، وضعیت) بیت‌به‌بیت یا کاراکتر‌به‌کاراکتر استنتاج می‌شود.",
-      ),
-      blk("ul", "شرط درست → صفحه عادی"),
-      blk("ul", "شرط غلط → صفحه خالی، پیام دیگر، یا کد متفاوت"),
-    ],
-  );
-
-  pages[PAGE.sqliTime] = page(
-    PAGE.sqliTime,
-    "Time-based Blind",
-    "terminal",
-    ["SQL Injection", "Blind", "Time"],
-    PAGE.sqli,
-    [
-      blk("h1", "Time-based Blind"),
-      blk(
-        "p",
-        "اگر هیچ تفاوت ظاهری در پاسخ نباشد، تأخیر عمدی (SLEEP / WAITFOR) کانال منطقی می‌سازد: شرط درست = پاسخ دیرتر.",
-      ),
-      blk("callout", "تأخیر شبکه را با چند نمونه و آستانه زمانی از SLEEP واقعی جدا کن.", { callout: "tip" }),
-    ],
-  );
+  Object.assign(pages, createSqliRefPages());
 
   pages[PAGE.xss] = page(
     PAGE.xss,

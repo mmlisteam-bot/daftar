@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { markdownToBlocks } from "./parse";
 import { createSeed } from "./seed";
 import { getActiveUserId } from "./session";
+import { SQLI_EXPAND } from "./sqli-ref";
 import { pageFromTemplate, type PageTemplate } from "./templates";
 import {
   emptyBlock,
@@ -190,7 +191,7 @@ export const useNotes = create<NotesState>()(
         order: seed.order,
         currentId: seed.order[0]!,
         theme: "dark",
-        expanded: { [seed.order[2] ?? ""]: true },
+        expanded: { ...SQLI_EXPAND },
         filterTag: null,
         hydrated: false,
         histRev: 0,
@@ -607,7 +608,7 @@ export const useNotes = create<NotesState>()(
             pages: fresh.pages,
             order: fresh.order,
             currentId: fresh.order[0]!,
-            expanded: {},
+            expanded: getActiveUserId() === "hadis" ? {} : { ...SQLI_EXPAND },
             filterTag: null,
             trash: {},
           });
@@ -620,7 +621,7 @@ export const useNotes = create<NotesState>()(
             order: fresh.order,
             currentId: fresh.order[0]!,
             theme: "dark",
-            expanded: {},
+            expanded: getActiveUserId() === "hadis" ? {} : { ...SQLI_EXPAND },
             filterTag: null,
             hydrated: false,
             histRev: 0,
