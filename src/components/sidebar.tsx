@@ -23,6 +23,27 @@ import { PAGE_TEMPLATES } from "@/lib/notes/templates";
 import type { Page } from "@/lib/notes/types";
 import { cn } from "@/lib/utils";
 
+const PAGE_MIME = "application/x-daftar-page";
+
+function writePageDrag(e: DragEvent, id: string) {
+  e.dataTransfer.setData(PAGE_MIME, id);
+  e.dataTransfer.setData("text/plain", `daftar-page:${id}`);
+  e.dataTransfer.effectAllowed = "move";
+}
+
+function hasPageDrag(e: DragEvent): boolean {
+  const types = Array.from(e.dataTransfer.types);
+  return types.includes(PAGE_MIME) || types.includes("text/plain");
+}
+
+function readPageDrag(e: DragEvent): string | null {
+  const custom = e.dataTransfer.getData(PAGE_MIME);
+  if (custom) return custom;
+  const raw = e.dataTransfer.getData("text/plain");
+  if (raw.startsWith("daftar-page:")) return raw.slice("daftar-page:".length);
+  return null;
+}
+
 function PageRow({
   page,
   depth,
@@ -48,31 +69,40 @@ function PageRow({
   const open = expanded[page.id] ?? false;
   const active = currentId === page.id;
   const [over, setOver] = useState<"before" | "after" | "inside" | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   function onDragStart(e: DragEvent) {
-    e.dataTransfer.setData("text/plain", `daftar-page:${page.id}`);
-    e.dataTransfer.effectAllowed = "move";
+    e.stopPropagation();
+    writePageDrag(e, page.id);
+    setDragging(true);
   }
 
   function zoneFor(e: DragEvent): "before" | "after" | "inside" {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const y = e.clientY - rect.top;
-    if (y < rect.height * 0.28) return "before";
-    if (y > rect.height * 0.72) return "after";
+    if (y < 7) return "before";
+    if (y > rect.height - 7) return "after";
     return "inside";
   }
 
   function onDragOver(e: DragEvent) {
     e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
     setOver(zoneFor(e));
+  }
+
+  function onDragLeave(e: DragEvent) {
+    const next = e.relatedTarget as Node | null;
+    if (next && (e.currentTarget as HTMLElement).contains(next)) return;
+    setOver(null);
   }
 
   function onDrop(e: DragEvent) {
     e.preventDefault();
-    const raw = e.dataTransfer.getData("text/plain");
+    e.stopPropagation();
+    const id = readPageDrag(e);
     setOver(null);
-    if (!raw.startsWith("daftar-page:")) return;
-    const id = raw.slice("daftar-page:".length);
     if (!id || id === page.id) return;
     movePage(id, page.id, zoneFor(e));
   }
@@ -86,23 +116,35 @@ function PageRow({
     <div>
       <div
         draggable={!compact}
+        data-page-id={page.id}
+        title={compact ? undefined : "بکش و روی صفحهٔ دیگر رها کن تا زیرمجموعه‌اش شود"}
         onDragStart={onDragStart}
+        onDragEnd={() => {
+          setDragging(false);
+          setOver(null);
+        }}
         onDragOver={onDragOver}
-        onDragLeave={() => setOver(null)}
+        onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
           "group relative flex items-center rounded-md pe-0.5 text-[13px] transition-colors",
+          !compact && "cursor-grab active:cursor-grabbing",
           compact ? "h-9" : "h-8",
           active ? "bg-surface-2 text-fg" : "text-muted hover:bg-surface-2/70 hover:text-fg",
-          over === "inside" && "ring-1 ring-accent/50",
+          dragging && "opacity-40",
+          over === "inside" && "bg-accent/15 ring-1 ring-accent/60",
+          over && "[&_button]:pointer-events-none",
         )}
         style={{ paddingInlineStart: 6 + depth * (compact ? 8 : 12) }}
       >
         {over === "before" ? (
-          <span className="pointer-events-none absolute inset-x-2 top-0 h-px bg-accent" />
+          <span className="pointer-events-none absolute inset-x-2 top-0 h-0.5 rounded-full bg-accent" />
         ) : null}
         {over === "after" ? (
-          <span className="pointer-events-none absolute inset-x-2 bottom-0 h-px bg-accent" />
+          <span className="pointer-events-none absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-accent" />
+        ) : null}
+        {over === "inside" ? (
+          <span className="pointer-events-none absolute inset-y-0 start-0 w-0.5 rounded-full bg-accent" />
         ) : null}
         {kids.length > 0 ? (
           <button
@@ -248,6 +290,8 @@ export function Sidebar({
   const restorePage = useNotes((s) => s.restorePage);
   const dropForever = useNotes((s) => s.dropForever);
   const setCurrent = useNotes((s) => s.setCurrent);
+  const addTag = useNotes((s) => s.addTag);
+  const movePage = useNotes((s) => s.movePage);
   const [tagQ, setTagQ] = useState("");
   const [tplOpen, setTplOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
@@ -396,7 +440,24 @@ export function Sidebar({
           </div>
         ) : null}
 
-        <div className="mb-1 flex items-center justify-between px-1">
+        <div
+          className="mb-1 flex items-center justify-between rounded-md px-1"
+          onDragOver={(e) => {
+            if (!hasPageDrag(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            e.currentTarget.classList.add("bg-accent/15");
+          }}
+          onDragLeave={(e) => {
+            e.currentTarget.classList.remove("bg-accent/15");
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.currentTarget.classList.remove("bg-accent/15");
+            const id = readPageDrag(e);
+            if (id) movePage(id, null, "root");
+          }}
+        >
           <span className="text-[11px] font-medium text-subtle">صفحات</span>
           <button
             type="button"
@@ -415,7 +476,7 @@ export function Sidebar({
         <input
           value={tagQ}
           onChange={(e) => setTagQ(e.target.value)}
-          placeholder="فیلتر تگ"
+          placeholder="فیلتر تگ · صفحه را روی تگ رها کن"
           className="mt-1 mb-1.5 h-8 w-full rounded-md border border-border bg-bg px-2 text-[12px] outline-none placeholder:text-subtle"
         />
         <div className="flex flex-wrap gap-1 px-0.5">
@@ -426,6 +487,16 @@ export function Sidebar({
                 key={tag}
                 type="button"
                 onClick={() => setFilterTag(on ? null : tag)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const id = readPageDrag(e);
+                  if (id) addTag(id, tag);
+                }}
                 className={cn(
                   "rounded-full px-2 py-1 text-[11px] transition-colors",
                   on ? "bg-accent text-accent-fg" : "bg-surface-2 text-muted hover:text-fg",

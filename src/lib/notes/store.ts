@@ -76,7 +76,7 @@ type NotesState = NotesSnapshot & {
   restorePage: (id: string) => void;
   purgeTrash: () => void;
   dropForever: (id: string) => void;
-  movePage: (dragId: string, targetId: string, pos: "before" | "after" | "inside") => void;
+  movePage: (dragId: string, targetId: string | null, pos: "before" | "after" | "inside" | "root") => void;
   updatePage: (id: string, patch: Partial<Pick<Page, "title" | "icon" | "tags">>) => void;
   addTag: (id: string, tag: string) => void;
   removeTag: (id: string, tag: string) => void;
@@ -349,17 +349,26 @@ export const useNotes = create<NotesState>()(
           if (dragId === targetId) return;
           const { pages, order } = get();
           const drag = pages[dragId];
-          const target = pages[targetId];
-          if (!drag || !target) return;
+          if (!drag) return;
           const desc = descendants(pages, dragId);
-          if (desc.includes(targetId)) return;
-          if (pos === "inside" && (dragId === targetId || desc.includes(targetId))) return;
-          const nextParent = pos === "inside" ? targetId : target.parentId;
-          if (nextParent && (nextParent === dragId || desc.includes(nextParent))) return;
+          if (targetId && desc.includes(targetId)) return;
           capture();
           const nextPages: Record<string, Page> = { ...pages };
           let nextOrder = order.filter((id) => id !== dragId);
           const now = Date.now();
+
+          if (pos === "root" || !targetId) {
+            nextPages[dragId] = { ...drag, parentId: null, updatedAt: now, sort: now };
+            nextOrder.push(dragId);
+            set({ pages: nextPages, order: nextOrder });
+            return;
+          }
+
+          const target = pages[targetId];
+          if (!target) return;
+          if (pos === "inside" && (dragId === targetId || desc.includes(targetId))) return;
+          const nextParent = pos === "inside" ? targetId : target.parentId;
+          if (nextParent && (nextParent === dragId || desc.includes(nextParent))) return;
           nextPages[dragId] = { ...drag, parentId: nextParent, updatedAt: now, sort: now };
 
           if (nextParent === null) {
