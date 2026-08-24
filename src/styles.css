@@ -226,3 +226,25 @@
 .lightbox {
   cursor: zoom-in;
 }
+
+.hadis-heart {
+  color: #e2557a;
+  animation: hadis-beat 1.35s ease-in-out infinite;
+  filter: drop-shadow(0 10px 22px color-mix(in oklab, #e2557a 45%, transparent));
+}
+
+@keyframes hadis-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  16% {
+    transform: scale(1.16);
+  }
+  32% {
+    transform: scale(1);
+  }
+  48% {
+    transform: scale(1.1);
+  }
+}

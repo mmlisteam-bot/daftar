@@ -7,6 +7,7 @@ export type SessionUser = {
 const SESSION_KEY = "daftar-session";
 const REMEMBER_KEY = "daftar-remember";
 const NOTES_PREFIX = "daftar-notes-v2";
+const HADIS_HELLO = "daftar-hadis-hello";
 
 const USERS: { id: string; username: string; name: string; hash: string }[] = [
   {
@@ -109,6 +110,7 @@ export async function login(
   if (!user) return null;
   migrateLegacyNotes(user.id);
   setActiveUserId(user.id);
+  if (user.id === "hadis") sessionStorage.removeItem(HADIS_HELLO);
   const session: SessionUser = { id: user.id, username: user.username, name: user.name };
   const payload = JSON.stringify(session);
   localStorage.removeItem(SESSION_KEY);
@@ -126,5 +128,16 @@ export async function login(
 export function logout(): void {
   localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(HADIS_HELLO);
   setActiveUserId("guest");
+}
+
+export function shouldShowHadisHello(userId: string): boolean {
+  if (userId !== "hadis") return false;
+  if (typeof sessionStorage === "undefined") return true;
+  return !sessionStorage.getItem(HADIS_HELLO);
+}
+
+export function markHadisHelloSeen(): void {
+  sessionStorage.setItem(HADIS_HELLO, "1");
 }

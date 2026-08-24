@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { BackupPrompt } from "@/components/backup-prompt";
 import { Editor } from "@/components/editor";
 import { Flashcards } from "@/components/flashcards";
+import { HadisWelcome } from "@/components/hadis-welcome";
 import { LoginScreen } from "@/components/login-screen";
 import { PayloadPanel } from "@/components/payload-panel";
 import { SearchDialog } from "@/components/search-dialog";
@@ -25,7 +26,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 import { applyBackupImages, downloadAllZip, downloadJsonBackup, parseBackupFile } from "@/lib/notes/backup";
 import { downloadText, pageToMarkdown, blockToMarkdown } from "@/lib/notes/markdown";
-import { getSession, logout, setActiveUserId, type SessionUser } from "@/lib/notes/session";
+import { getSession, logout, markHadisHelloSeen, setActiveUserId, shouldShowHadisHello, type SessionUser } from "@/lib/notes/session";
 import { useNotes } from "@/lib/notes/store";
 import type { NotesSnapshot } from "@/lib/notes/types";
 
@@ -86,6 +87,7 @@ function NotesWorkspace({
   const [payloads, setPayloads] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
   const [cards, setCards] = useState(false);
+  const [hadisHi, setHadisHi] = useState(() => shouldShowHadisHello(user.id));
 
   useEffect(() => {
     primeWorkspace();
@@ -104,10 +106,11 @@ function NotesWorkspace({
 
   useEffect(() => {
     if (!hydrated) return;
+    if (hadisHi) return;
     const key = `daftar-backup-nag:${user.id}`;
     if (sessionStorage.getItem(key)) return;
     setBackupOpen(true);
-  }, [hydrated, user.id]);
+  }, [hydrated, user.id, hadisHi]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -222,6 +225,7 @@ function NotesWorkspace({
         <Sidebar
           onOpenSearch={() => setSearch(true)}
           userName={user.name}
+          heart={user.id === "hadis"}
           onLogout={onLogout}
           onOpenPayloads={() => setPayloads(true)}
         />
@@ -244,6 +248,7 @@ function NotesWorkspace({
               }}
               onClose={() => setMobileNav(false)}
               userName={user.name}
+              heart={user.id === "hadis"}
               onLogout={onLogout}
               onOpenPayloads={() => {
                 setPayloads(true);
@@ -422,6 +427,14 @@ function NotesWorkspace({
       <SearchDialog open={search} onOpenChange={setSearch} />
       <PayloadPanel open={payloads} onClose={() => setPayloads(false)} />
       <Flashcards open={cards} onClose={() => setCards(false)} />
+      {hadisHi ? (
+        <HadisWelcome
+          onContinue={() => {
+            markHadisHelloSeen();
+            setHadisHi(false);
+          }}
+        />
+      ) : null}
       <BackupPrompt userName={user.username} open={backupOpen} onClose={closeBackup} />
     </div>
   );

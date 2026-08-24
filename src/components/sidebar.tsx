@@ -2,6 +2,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Copy,
+  Heart,
   History,
   LayoutTemplate,
   LogOut,
@@ -226,6 +227,7 @@ export function Sidebar({
   onLogout,
   onOpenPayloads,
   compact,
+  heart,
 }: {
   onOpenSearch: () => void;
   onClose?: () => void;
@@ -233,6 +235,7 @@ export function Sidebar({
   onLogout?: () => void;
   onOpenPayloads?: () => void;
   compact?: boolean;
+  heart?: boolean;
 }) {
   const pages = useNotes((s) => s.pages);
   const order = useNotes((s) => s.order);
@@ -282,7 +285,12 @@ export function Sidebar({
       <div className={cn("flex items-center justify-between gap-2 px-3", compact ? "pt-3 pb-1" : "pt-4 pb-2")}>
         <div className="min-w-0">
           <div className="text-[15px] font-semibold tracking-tight">Daftar</div>
-          <div className="truncate text-[11px] text-muted">{userName ?? "جزوه پنتست وب"}</div>
+          <div className="flex items-center gap-1.5">
+            <div className="truncate text-[11px] text-muted">{userName ?? "جزوه پنتست وب"}</div>
+            {heart ? (
+              <Heart className="hadis-heart size-3.5 shrink-0" fill="currentColor" aria-hidden />
+            ) : null}
+          </div>
         </div>
         {onClose ? (
           <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="بستن منو">
