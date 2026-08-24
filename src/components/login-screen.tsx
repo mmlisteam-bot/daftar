@@ -4,21 +4,30 @@ import { Button } from "@/components/ui/button";
 import { getRememberPref, getRememberedUsername, login, type SessionUser } from "@/lib/notes/session";
 import { migrateOwnerImages } from "@/lib/notes/images";
 
+function hasPersian(s: string): boolean {
+  return /[\u0600-\u06FF]/.test(s);
+}
+
 export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => void }) {
   const [username, setUsername] = useState(getRememberedUsername);
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(getRememberPref);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const persianKb = hasPersian(username) || hasPersian(password);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      const user = await login(username, password, remember);
+      const user = await login(username.trim(), password, remember);
       if (!user) {
-        setError("نام کاربری یا رمز اشتباه است.");
+        setError(
+          persianKb
+            ? "کیبورد فارسی است. یوزر و رمز را انگلیسی بزن (mmli / hadis)."
+            : "نام کاربری یا رمز اشتباه است.",
+        );
         return;
       }
       if (user.id === "mmli") await migrateOwnerImages().catch(() => {});
@@ -60,6 +69,10 @@ export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => v
           <input
             dir="ltr"
             type="password"
+            lang="en"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -77,6 +90,9 @@ export function LoginScreen({ onSuccess }: { onSuccess: (user: SessionUser) => v
           مرا به خاطر بسپار
         </label>
 
+        {persianKb ? (
+          <p className="mb-3 text-[14px] leading-6 text-warn">کیبورد فارسی است — یوزر و رمز را انگلیسی بنویس.</p>
+        ) : null}
         {error ? <p className="mb-3 text-[15px] text-danger">{error}</p> : null}
 
         <Button type="submit" className="w-full" disabled={busy}>
