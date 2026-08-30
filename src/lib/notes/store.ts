@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { markdownToBlocks } from "./parse";
+import { pageBody } from "./markdown";
 import { createSeed } from "./seed";
 import { getActiveUserId } from "./session";
 import { SQLI_EXPAND } from "./sqli-ref";
@@ -88,6 +89,8 @@ type NotesState = NotesSnapshot & {
   removeBlock: (pageId: string, blockId: string) => void;
   moveBlock: (pageId: string, blockId: string, dir: -1 | 1) => void;
   reorderBlocks: (pageId: string, fromId: string, toId: string) => void;
+  updateBody: (pageId: string, body: string) => void;
+  appendBody: (pageId: string, chunk: string) => void;
   importSnapshot: (data: NotesSnapshot) => void;
   importMarkdown: (pageId: string, md: string) => void;
   resetDemo: () => void;
@@ -134,6 +137,7 @@ function clonePageRecord(page: Page, titleSuffix = " (کپی)"): Page {
       headers: b.headers ? [...b.headers] : undefined,
       rows: b.rows ? b.rows.map((r) => [...r]) : undefined,
     })),
+    body: page.body,
   };
 }
 
@@ -571,6 +575,27 @@ export const useNotes = create<NotesState>()(
             };
           });
         },
+        updateBody: (pageId, body) => {
+          captureTyping();
+          const blocks = markdownToBlocks(body);
+          set((s) => {
+            const page = s.pages[pageId];
+            if (!page) return s;
+            return {
+              pages: {
+                ...s.pages,
+                [pageId]: { ...page, body, blocks, updatedAt: Date.now() },
+              },
+            };
+          });
+        },
+        appendBody: (pageId, chunk) => {
+          const page = get().pages[pageId];
+          if (!page) return;
+          const cur = pageBody(page);
+          const next = cur.trim() ? `${cur.replace(/\s+$/, "")}\n\n${chunk.trim()}\n` : `${chunk.trim()}\n`;
+          get().updateBody(pageId, next);
+        },
         importSnapshot: (data) => {
           if (!data?.pages || !data.order?.length) return;
           capture();
@@ -587,10 +612,12 @@ export const useNotes = create<NotesState>()(
         importMarkdown: (pageId, md) => {
           const parsed = markdownToBlocks(md);
           let title: string | undefined;
+          let body = md.replace(/^\uFEFF/, "");
           let blocks = parsed;
           if (parsed[0]?.type === "h1" && parsed[0].content.trim()) {
             title = parsed[0].content.trim();
-            blocks = parsed.slice(1);
+            body = md.replace(/^\uFEFF?#[^\n]*\n*/, "").replace(/^\n+/, "");
+            blocks = markdownToBlocks(body);
           }
           if (blocks.length === 0) blocks = [emptyBlock("p")];
           capture();
@@ -604,6 +631,7 @@ export const useNotes = create<NotesState>()(
                   ...page,
                   title: title ?? page.title,
                   blocks,
+                  body,
                   updatedAt: Date.now(),
                 },
               },

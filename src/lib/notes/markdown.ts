@@ -56,10 +56,25 @@ export function blockToMarkdown(block: Block): string {
   }
 }
 
+export function pageBody(page: Page): string {
+  if (typeof page.body === "string") return page.body;
+  return page.blocks.map(blockToMarkdown).filter(Boolean).join("\n\n");
+}
+
 export function pageToMarkdown(page: Page): string {
   const tags = page.tags.length ? `\n\nTags: ${page.tags.map((t) => `\`${t}\``).join(" · ")}` : "";
-  const body = page.blocks.map(blockToMarkdown).filter(Boolean).join("\n\n");
+  const body = pageBody(page);
   return `# ${page.title}${tags}\n\n${body}\n`;
+}
+
+export function guessDocDir(text: string): "ltr" | "rtl" {
+  const letters = text.match(/\p{L}/gu) ?? [];
+  if (!letters.length) return "rtl";
+  let rtl = 0;
+  for (const ch of letters) {
+    if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(ch)) rtl += 1;
+  }
+  return rtl > letters.length * 0.35 ? "rtl" : "ltr";
 }
 
 export function downloadText(filename: string, text: string, mime = "text/plain") {

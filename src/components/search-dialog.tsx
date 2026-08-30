@@ -2,6 +2,7 @@ import { Command } from "cmdk";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PageGlyph } from "@/components/page-icon";
+import { pageBody } from "@/lib/notes/markdown";
 import { useNotes } from "@/lib/notes/store";
 import type { PageIcon } from "@/lib/notes/types";
 import { cn } from "@/lib/utils";
@@ -51,25 +52,21 @@ export function SearchDialog({
           icon: p.icon,
         });
       }
-      for (const b of p.blocks) {
-        const blob = [b.content, b.inner ?? "", ...(b.headers ?? []), ...(b.rows ?? []).flat()].join(" ");
-        const lower = blob.toLowerCase();
-        if (!lower.includes(query) || !b.content.trim()) continue;
-        const key = `${p.id}:${b.id}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const i = b.content.toLowerCase().indexOf(query);
-        const src = i >= 0 ? b.content : blob;
-        const at = src.toLowerCase().indexOf(query);
-        const snippet = (at >= 0 ? src.slice(Math.max(0, at - 18), at + query.length + 28) : src).slice(0, 80);
-        hits.push({
-          pageId: p.id,
-          blockId: b.id,
-          title: p.title || "بدون عنوان",
-          snippet: snippet.trim(),
-          icon: p.icon,
-        });
-      }
+      const blob = pageBody(p) || p.blocks.map((b) => b.content).join("\n");
+      const lower = blob.toLowerCase();
+      if (!lower.includes(query)) continue;
+      const at = lower.indexOf(query);
+      const snippet = blob.slice(Math.max(0, at - 18), at + query.length + 28).slice(0, 80);
+      const key = `${p.id}:body`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      hits.push({
+        pageId: p.id,
+        blockId: null,
+        title: p.title || "بدون عنوان",
+        snippet: snippet.trim(),
+        icon: p.icon,
+      });
     }
     return hits.slice(0, 30);
   }, [pages, q]);

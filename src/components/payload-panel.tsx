@@ -2,14 +2,13 @@ import { Check, Copy, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PAYLOAD_GROUPS, type PayloadItem } from "@/lib/notes/payloads";
-import { emptyBlock, nid } from "@/lib/notes/types";
 import { useNotes } from "@/lib/notes/store";
 import { cn } from "@/lib/utils";
 
 export function PayloadPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const currentId = useNotes((s) => s.currentId);
   const pages = useNotes((s) => s.pages);
-  const insertBlocks = useNotes((s) => s.insertBlocks);
+  const appendBody = useNotes((s) => s.appendBody);
   const [copied, setCopied] = useState<string | null>(null);
   const [openGroup, setOpenGroup] = useState<string>(PAYLOAD_GROUPS[0]?.id ?? "sqli");
   const page = pages[currentId];
@@ -24,11 +23,7 @@ export function PayloadPanel({ open, onClose }: { open: boolean; onClose: () => 
 
   function insertItem(item: PayloadItem) {
     if (!page) return;
-    const block = emptyBlock("code");
-    block.id = nid();
-    block.lang = item.lang;
-    block.content = item.code;
-    insertBlocks(page.id, page.blocks.at(-1)?.id ?? null, [block]);
+    appendBody(page.id, `\`\`\`${item.lang}\n${item.code}\n\`\`\``);
     onClose();
   }
 

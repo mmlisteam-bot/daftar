@@ -35,7 +35,6 @@ export type Block = {
   inner?: string;
   headers?: string[];
   rows?: string[][];
-  /** Nested list depth. 0 = top level. Used by ul / ol / todo. */
   indent?: number;
 };
 
@@ -58,6 +57,8 @@ export type Page = {
   icon: PageIcon;
   tags: string[];
   blocks: Block[];
+  /** Markdown source. When set, this is what you edit; blocks are derived. */
+  body?: string;
   createdAt: number;
   updatedAt: number;
   sort?: number;
@@ -110,6 +111,7 @@ export function emptyPage(partial?: Partial<Page>): Page {
     icon: "file",
     tags: [],
     blocks: [emptyBlock("p")],
+    body: "",
     createdAt: now,
     updatedAt: now,
     sort: now,

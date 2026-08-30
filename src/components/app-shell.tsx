@@ -26,7 +26,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 import { applyBackupImages, downloadAllZip, downloadJsonBackup, parseBackupFile } from "@/lib/notes/backup";
 import { SQLI_EXPAND, SQLI_REF_FLAG, applySqliRef } from "@/lib/notes/sqli-ref";
-import { downloadText, pageToMarkdown, blockToMarkdown } from "@/lib/notes/markdown";
+import { downloadText, pageToMarkdown } from "@/lib/notes/markdown";
 import { getSession, logout, markHadisHelloSeen, setActiveUserId, shouldShowHadisHello, type SessionUser } from "@/lib/notes/session";
 import { useNotes } from "@/lib/notes/store";
 import type { NotesSnapshot } from "@/lib/notes/types";
@@ -188,11 +188,7 @@ function NotesWorkspace({
 
   function convertMarkdownOnPage() {
     if (!page) return;
-    const md = page.blocks
-      .map((b) => (b.type === "p" || b.type === "quote" ? b.content : blockToMarkdown(b)))
-      .filter(Boolean)
-      .join("\n\n");
-    importMarkdown(page.id, md);
+    importMarkdown(page.id, pageToMarkdown(page));
   }
 
   function exportMd() {
