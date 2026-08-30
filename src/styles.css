@@ -154,6 +154,10 @@
   line-height: 1.8;
 }
 
+.note-doc-read {
+  padding-inline-start: 1.6rem;
+}
+
 .note-doc .note-h1 {
   font-size: 1.55em;
   font-weight: 650;
@@ -181,7 +185,7 @@
 
 .note-doc .note-list {
   margin: 0.15em 0 0.7em;
-  padding-inline-start: 1.35em;
+  padding-inline-start: 1.55em;
 }
 
 .note-doc .note-list .note-list {
@@ -191,6 +195,69 @@
 .note-doc .note-list li {
   margin: 0.12em 0;
   padding-inline-start: 0.15em;
+}
+
+.note-doc .note-li {
+  position: relative;
+}
+
+.note-doc .note-heading {
+  position: relative;
+}
+
+.fold-btn {
+  position: absolute;
+  inset-inline-start: -1.7em;
+  top: 0.18em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  opacity: 0.55;
+  transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease, transform 0.12s ease;
+}
+
+.note-heading .fold-btn {
+  inset-inline-start: -1.85em;
+  top: 0.28em;
+}
+
+.fold-btn:hover,
+.fold-btn:focus-visible {
+  opacity: 1;
+  color: var(--fg);
+  background: color-mix(in oklab, var(--fg) 8%, transparent);
+}
+
+.fold-btn[data-folded="true"] {
+  opacity: 1;
+}
+
+.fold-btn svg {
+  transition: transform 0.15s ease;
+}
+
+.fold-btn[data-folded="true"] svg {
+  transform: rotate(-90deg);
+}
+
+[dir="rtl"] .fold-btn[data-folded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.note-li.has-fold:hover > .fold-btn,
+.note-heading.has-fold:hover > .fold-btn {
+  opacity: 1;
+}
+
+@media (pointer: coarse) {
+  .fold-btn {
+    opacity: 0.9;
+  }
 }
 
 .note-doc .note-quote {

@@ -211,7 +211,7 @@ function DocWriter({ page }: { page: Page }) {
   if (!editing) {
     return (
       <div
-        className="note-doc min-h-[40vh] cursor-text"
+        className="note-doc note-doc-read min-h-[40vh] cursor-text"
         dir={dir}
         onClick={(e) => {
           if ((e.target as HTMLElement).closest("a, button, input, summary, label")) return;

@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { HighlightedCode } from "@/lib/notes/highlight";
 import { headingAnchor, InlineMd } from "@/lib/notes/inline";
 import { getImageBlob } from "@/lib/notes/images";
@@ -17,8 +18,80 @@ const CALLOUT_LABEL: Record<CalloutKind, string> = {
   example: "مثال",
 };
 
+const FOLD_STORE = "daftar-folds";
+
+function loadFolds(pageId: string): Set<string> {
+  try {
+    const all = JSON.parse(localStorage.getItem(FOLD_STORE) || "{}") as Record<string, string[]>;
+    return new Set(all[pageId] ?? []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveFolds(pageId: string, folded: Set<string>) {
+  try {
+    const all = JSON.parse(localStorage.getItem(FOLD_STORE) || "{}") as Record<string, string[]>;
+    if (folded.size) all[pageId] = [...folded];
+    else delete all[pageId];
+    localStorage.setItem(FOLD_STORE, JSON.stringify(all));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+const FoldCtx = createContext<{
+  folded: Set<string>;
+  toggle: (key: string) => void;
+}>({ folded: new Set(), toggle: () => {} });
+
+function usePageFold(pageId: string) {
+  const [folded, setFolded] = useState(() => loadFolds(pageId));
+  useEffect(() => {
+    setFolded(loadFolds(pageId));
+  }, [pageId]);
+  function toggle(key: string) {
+    setFolded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      saveFolds(pageId, next);
+      return next;
+    });
+  }
+  return { folded, toggle };
+}
+
+function FoldBtn({ k, label }: { k: string; label: string }) {
+  const { folded, toggle } = useContext(FoldCtx);
+  const isFolded = folded.has(k);
+  return (
+    <button
+      type="button"
+      className="fold-btn no-print"
+      data-folded={isFolded ? "true" : "false"}
+      aria-expanded={!isFolded}
+      aria-label={isFolded ? `باز کردن ${label}` : `جمع کردن ${label}`}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggle(k);
+      }}
+    >
+      <ChevronDown className="size-3.5" strokeWidth={2.2} />
+    </button>
+  );
+}
+
 function isList(b: Block) {
   return b.type === "ul" || b.type === "ol" || b.type === "todo";
+}
+
+function headingLevel(type: Block["type"]): number {
+  if (type === "h1") return 1;
+  if (type === "h2") return 2;
+  if (type === "h3") return 3;
+  return 0;
 }
 
 type ListNode = { block: Block; children: ListNode[] };
@@ -84,15 +157,16 @@ function Inline({ pageId, text }: { pageId: string; text: string }) {
   return <InlineMd text={text} onWiki={(t) => jumpWiki(pageId, t)} />;
 }
 
-function ListTree({ pageId, nodes }: { pageId: string; nodes: ListNode[] }) {
+function ListTree({ pageId, nodes, path }: { pageId: string; nodes: ListNode[]; path: string }) {
   const updateBody = useNotes((s) => s.updateBody);
   const pages = useNotes((s) => s.pages);
   const page = pages[pageId];
+  const { folded } = useContext(FoldCtx);
 
   const kind = nodes[0]?.block.type === "ol" ? "ol" : "ul";
   const Tag = kind as "ul" | "ol";
 
-  function toggle(block: Block) {
+  function toggleTodo(block: Block) {
     if (!page) return;
     const blocks = page.blocks.map((b) =>
       b.id === block.id ? { ...b, checked: !b.checked } : b,
@@ -102,52 +176,44 @@ function ListTree({ pageId, nodes }: { pageId: string; nodes: ListNode[] }) {
 
   return (
     <Tag className="note-list">
-      {nodes.map((n) => (
-        <li key={n.block.id} data-block={n.block.id} className={n.block.checked ? "text-muted line-through" : undefined}>
-          {n.block.type === "todo" ? (
-            <label className="inline-flex items-start gap-2">
-              <input
-                type="checkbox"
-                className="mt-1.5 size-4 accent-accent"
-                checked={!!n.block.checked}
-                onChange={() => toggle(n.block)}
-              />
-              <span>
-                <Inline pageId={pageId} text={n.block.content} />
-              </span>
-            </label>
-          ) : (
-            <Inline pageId={pageId} text={n.block.content} />
-          )}
-          {n.children.length ? <ListTree pageId={pageId} nodes={n.children} /> : null}
-        </li>
-      ))}
+      {nodes.map((n, i) => {
+        const key = `l:${path}/${i}:${n.block.content.trim().toLowerCase()}`;
+        const hasKids = n.children.length > 0;
+        const isFolded = hasKids && folded.has(key);
+        return (
+          <li
+            key={n.block.id}
+            data-block={n.block.id}
+            data-fold-key={hasKids ? key : undefined}
+            className={cn("note-li", n.block.checked && "text-muted line-through", hasKids && "has-fold")}
+          >
+            {hasKids ? <FoldBtn k={key} label={n.block.content || "لیست"} /> : null}
+            {n.block.type === "todo" ? (
+              <label className="inline-flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-1.5 size-4 accent-accent"
+                  checked={!!n.block.checked}
+                  onChange={() => toggleTodo(n.block)}
+                />
+                <span>
+                  <Inline pageId={pageId} text={n.block.content} />
+                </span>
+              </label>
+            ) : (
+              <Inline pageId={pageId} text={n.block.content} />
+            )}
+            {hasKids && !isFolded ? (
+              <ListTree pageId={pageId} nodes={n.children} path={`${path}/${i}`} />
+            ) : null}
+          </li>
+        );
+      })}
     </Tag>
   );
 }
 
 function FlowBlock({ pageId, block }: { pageId: string; block: Block }) {
-  if (block.type === "h1") {
-    return (
-      <h1 data-block={block.id} data-heading={headingAnchor(block.content)} className="note-h1">
-        <Inline pageId={pageId} text={block.content} />
-      </h1>
-    );
-  }
-  if (block.type === "h2") {
-    return (
-      <h2 data-block={block.id} data-heading={headingAnchor(block.content)} className="note-h2">
-        <Inline pageId={pageId} text={block.content} />
-      </h2>
-    );
-  }
-  if (block.type === "h3") {
-    return (
-      <h3 data-block={block.id} data-heading={headingAnchor(block.content)} className="note-h3">
-        <Inline pageId={pageId} text={block.content} />
-      </h3>
-    );
-  }
   if (block.type === "divider") return <hr className="my-5 border-border" />;
   if (block.type === "code") {
     return (
@@ -246,25 +312,71 @@ function FlowBlock({ pageId, block }: { pageId: string; block: Block }) {
   );
 }
 
-export function DocView({ page }: { page: Page }) {
-  const blocks = page.blocks;
+function HeadingBlock({ pageId, block, foldKey, foldable }: { pageId: string; block: Block; foldKey: string; foldable: boolean }) {
+  const Tag = block.type === "h1" ? "h1" : block.type === "h3" ? "h3" : "h2";
+  const cls = block.type === "h1" ? "note-h1" : block.type === "h3" ? "note-h3" : "note-h2";
+  return (
+    <Tag
+      data-block={block.id}
+      data-heading={headingAnchor(block.content)}
+      data-fold-key={foldable ? foldKey : undefined}
+      className={cn(cls, "note-heading", foldable && "has-fold")}
+    >
+      {foldable ? <FoldBtn k={foldKey} label={block.content || "تیتر"} /> : null}
+      <Inline pageId={pageId} text={block.content} />
+    </Tag>
+  );
+}
+
+function Flow({ pageId, blocks }: { pageId: string; blocks: Block[] }) {
+  const { folded } = useContext(FoldCtx);
   const nodes: ReactNode[] = [];
   let i = 0;
   while (i < blocks.length) {
     const b = blocks[i]!;
+    const lvl = headingLevel(b.type);
+    if (lvl) {
+      let j = i + 1;
+      while (j < blocks.length) {
+        const n = headingLevel(blocks[j]!.type);
+        if (n && n <= lvl) break;
+        j += 1;
+      }
+      const rest = blocks.slice(i + 1, j);
+      const key = `h:${headingAnchor(b.content)}:${lvl}`;
+      const foldable = rest.length > 0;
+      const isFolded = foldable && folded.has(key);
+      nodes.push(
+        <section key={b.id} className="note-section">
+          <HeadingBlock pageId={pageId} block={b} foldKey={key} foldable={foldable} />
+          {foldable && !isFolded ? <Flow pageId={pageId} blocks={rest} /> : null}
+        </section>,
+      );
+      i = j;
+      continue;
+    }
     if (isList(b)) {
       let j = i;
       while (j < blocks.length && isList(blocks[j]!)) j += 1;
       const id = blocks[i]!.id;
-      nodes.push(<ListTree key={id} pageId={page.id} nodes={nestList(blocks.slice(i, j))} />);
+      nodes.push(<ListTree key={id} pageId={pageId} nodes={nestList(blocks.slice(i, j))} path={id.slice(0, 8)} />);
       i = j;
       continue;
     }
-    nodes.push(<FlowBlock key={b.id} pageId={page.id} block={b} />);
+    nodes.push(<FlowBlock key={b.id} pageId={pageId} block={b} />);
     i += 1;
   }
-  if (!pageBody(page).trim() && !blocks.some((b) => b.content.trim() || b.type === "image" || b.type === "table")) {
+  return <>{nodes}</>;
+}
+
+export function DocView({ page }: { page: Page }) {
+  const fold = usePageFold(page.id);
+  if (!pageBody(page).trim() && !page.blocks.some((b) => b.content.trim() || b.type === "image" || b.type === "table")) {
     return <p className="text-subtle">برای نوشتن کلیک کن یا از ابسیدین پیست کن…</p>;
   }
-  return <>{nodes}</>;
+  return (
+    <FoldCtx.Provider value={fold}>
+      <Flow pageId={page.id} blocks={page.blocks} />
+    </FoldCtx.Provider>
+  );
 }
