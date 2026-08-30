@@ -99,13 +99,26 @@ function headingOf(line: string): { level: 1 | 2 | 3; text: string } | null {
   return { level: n, text: m[2]!.trim() };
 }
 
-function listOf(line: string): { type: "ul" | "ol" | "todo"; text: string; checked?: boolean } | null {
-  const todo = line.match(/^\s*[-*+]\s+\[([ xX])\]\s+(.*)$/);
-  if (todo) return { type: "todo", text: todo[2] ?? "", checked: todo[1] !== " " };
-  const ul = line.match(/^\s*[-*+]\s+(.*)$/);
-  if (ul) return { type: "ul", text: ul[1] ?? "" };
-  const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
-  if (ol) return { type: "ol", text: ol[1] ?? "" };
+function leadingWidth(ws: string): number {
+  let n = 0;
+  for (const ch of ws) n += ch === "\t" ? 2 : 1;
+  return n;
+}
+
+function listOf(
+  line: string,
+): { type: "ul" | "ol" | "todo"; text: string; checked?: boolean; indent: number } | null {
+  const lead = line.match(/^([ \t]*)(.*)$/);
+  if (!lead) return null;
+  const ws = lead[1] ?? "";
+  const rest = lead[2] ?? "";
+  const indent = Math.min(8, Math.floor(leadingWidth(ws) / 2));
+  const todo = rest.match(/^[-*+]\s+\[([ xX])\]\s+(.*)$/);
+  if (todo) return { type: "todo", text: todo[2] ?? "", checked: todo[1] !== " ", indent };
+  const ul = rest.match(/^[-*+]\s+(.*)$/);
+  if (ul) return { type: "ul", text: ul[1] ?? "", indent };
+  const ol = rest.match(/^\d+[.)]\s+(.*)$/);
+  if (ol) return { type: "ol", text: ol[1] ?? "", indent };
   return null;
 }
 
@@ -130,9 +143,10 @@ export function looksLikeMarkdown(text: string): boolean {
   if (/^\|.+\|/m.test(t) && /\|?\s*:?-{3,}/m.test(t)) return true;
   if (/^>\s*\[!/m.test(t)) return true;
   if (/^---\s*$/m.test(t) && t.includes("\n")) return true;
-  if (/^\s*[-*+]\s+\S/m.test(t) && (t.includes("\n") || t.includes("[["))) return true;
+  if (/^\s*[-*+]\s+\S/m.test(t)) return true;
   if (/^\s*\d+[.)]\s+\S/m.test(t) && t.includes("\n")) return true;
   if (/\*\*[^*]+\*\*/.test(t) && t.includes("\n")) return true;
+  if (/^\s*>\s+\S/m.test(t) && t.includes("\n")) return true;
   return false;
 }
 
@@ -147,6 +161,35 @@ export function tsvToBlock(text: string): Block {
   const lines = text.replace(/\r\n/g, "\n").trim().split("\n");
   const rows = lines.map((l) => l.split("\t").map((c) => c.trim()));
   return blk("table", "", { headers: rows[0], rows: rows.slice(1) });
+}
+
+function isListType(t: Block["type"]): boolean {
+  return t === "ul" || t === "ol" || t === "todo";
+}
+
+function compressListIndents(blocks: Block[]): Block[] {
+  const out = blocks.map((b) => ({ ...b }));
+  let i = 0;
+  while (i < out.length) {
+    if (!isListType(out[i]!.type)) {
+      i += 1;
+      continue;
+    }
+    let j = i;
+    while (j < out.length && isListType(out[j]!.type)) j += 1;
+    const seen = [...new Set(out.slice(i, j).map((b) => b.indent ?? 0))].sort((a, b) => a - b);
+    const map = new Map(seen.map((v, idx) => [v, idx]));
+    for (let k = i; k < j; k++) {
+      out[k]!.indent = map.get(out[k]!.indent ?? 0) ?? 0;
+    }
+    i = j;
+  }
+  return out;
+}
+
+function maxIndentOf(blocks: Block[] | null | undefined): number {
+  if (!blocks?.length) return -1;
+  return blocks.reduce((m, b) => Math.max(m, b.indent ?? 0), 0);
 }
 
 export function markdownToBlocks(src: string): Block[] {
@@ -243,7 +286,12 @@ export function markdownToBlocks(src: string): Block[] {
     const li = listOf(line);
     if (li) {
       flushPara();
-      out.push(blk(li.type, li.text, li.type === "todo" ? { checked: li.checked } : {}));
+      out.push(
+        blk(li.type, li.text, {
+          ...(li.type === "todo" ? { checked: li.checked } : {}),
+          indent: li.indent,
+        }),
+      );
       i += 1;
       continue;
     }
@@ -254,17 +302,26 @@ export function markdownToBlocks(src: string): Block[] {
       continue;
     }
 
+    const prev = out[out.length - 1];
+    const contWs = line.match(/^([ \t]+)/);
+    if (prev && isListType(prev.type) && para.length === 0 && contWs && leadingWidth(contWs[1] ?? "") >= 2) {
+      prev.content = `${prev.content}\n${line.trim()}`;
+      i += 1;
+      continue;
+    }
+
     para.push(line);
     i += 1;
   }
   flushPara();
-  return out.length ? out : [blk("p")];
+  const result = out.length ? out : [blk("p")];
+  return compressListIndents(result);
 }
 
 function looksLikeRichHtml(html: string): boolean {
   if (!html || html.length < 8) return false;
   if (/StartFragment/i.test(html)) return true;
-  return /<(h[1-4]|table|pre|ul|ol|blockquote|hr)\b/i.test(html);
+  return /<(h[1-4]|table|pre|ul|ol|blockquote|hr|strong|em|li)\b/i.test(html);
 }
 
 function inlineFromNode(node: Node): string {
@@ -272,6 +329,7 @@ function inlineFromNode(node: Node): string {
   if (node.nodeType !== Node.ELEMENT_NODE) return "";
   const el = node as HTMLElement;
   const tag = el.tagName.toLowerCase();
+  if (tag === "ul" || tag === "ol") return "";
   const inner = [...el.childNodes].map(inlineFromNode).join("");
   if (tag === "br") return "\n";
   if (tag === "strong" || tag === "b") return `**${inner}**`;
@@ -305,6 +363,26 @@ function tableFromEl(table: HTMLTableElement): Block {
   return blk("table", "", { headers, rows: body.length ? body : [headers.map(() => "")] });
 }
 
+function indentFromStyle(el: HTMLElement, base: number): number {
+  const style = `${el.getAttribute("style") ?? ""} ${el.getAttribute("class") ?? ""}`;
+  const m = style.match(/(?:margin-left|padding-left|margin-inline-start|padding-inline-start)\s*:\s*([\d.]+)(px|em|rem)?/i);
+  if (m) {
+    const n = parseFloat(m[1] ?? "0");
+    const unit = m[2] || "px";
+    const px = unit === "px" ? n : n * 16;
+    return Math.min(8, base + Math.max(0, Math.round(px / 24)));
+  }
+  const data = el.getAttribute("data-indent") || el.getAttribute("data-level");
+  if (data && /^\d+$/.test(data)) return Math.min(8, parseInt(data, 10));
+  return base;
+}
+
+function listItemText(li: HTMLElement): string {
+  const clone = li.cloneNode(true) as HTMLElement;
+  for (const nested of clone.querySelectorAll("ul, ol")) nested.remove();
+  return inlineFromNode(clone).replace(/\n+/g, "\n").trim();
+}
+
 export function htmlToBlocks(html: string): Block[] {
   if (typeof DOMParser === "undefined") return [];
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -313,6 +391,22 @@ export function htmlToBlocks(html: string): Block[] {
   const pushText = (el: Element, type: Block["type"]) => {
     const text = inlineFromNode(el).trim();
     if (text) out.push(blk(type, text));
+  };
+
+  const walkList = (list: HTMLElement, indent: number) => {
+    const kind: Block["type"] = list.tagName.toLowerCase() === "ol" ? "ol" : "ul";
+    for (const li of list.querySelectorAll(":scope > li")) {
+      const el = li as HTMLElement;
+      const depth = indentFromStyle(el, indent);
+      const raw = listItemText(el);
+      const todo = raw.match(/^\[([ xX])\]\s*(.*)$/);
+      if (todo) out.push(blk("todo", todo[2] ?? "", { checked: todo[1] !== " ", indent: depth }));
+      else out.push(blk(kind, raw, { indent: depth }));
+      for (const child of el.children) {
+        const tag = child.tagName.toLowerCase();
+        if (tag === "ul" || tag === "ol") walkList(child as HTMLElement, depth + 1);
+      }
+    }
   };
 
   const walk = (node: Node) => {
@@ -352,12 +446,15 @@ export function htmlToBlocks(html: string): Block[] {
       return;
     }
     if (tag === "ul" || tag === "ol") {
-      const kind = tag === "ol" ? "ol" : "ul";
-      for (const li of el.querySelectorAll(":scope > li")) {
-        const raw = inlineFromNode(li).trim();
-        const todo = raw.match(/^\[([ xX])\]\s*(.*)$/);
-        if (todo) out.push(blk("todo", todo[2] ?? "", { checked: todo[1] !== " " }));
-        else out.push(blk(kind, raw));
+      walkList(el, 0);
+      return;
+    }
+    if (tag === "li") {
+      const raw = listItemText(el);
+      if (raw) out.push(blk("ul", raw, { indent: indentFromStyle(el, 0) }));
+      for (const child of el.children) {
+        const ct = child.tagName.toLowerCase();
+        if (ct === "ul" || ct === "ol") walkList(child as HTMLElement, 1);
       }
       return;
     }
@@ -370,7 +467,8 @@ export function htmlToBlocks(html: string): Block[] {
   };
 
   walk(doc.body);
-  return out.length ? out : [];
+  const result = out.length ? out : [];
+  return compressListIndents(result);
 }
 
 export function parseTsvGrid(text: string): string[][] {
@@ -410,11 +508,15 @@ export function clipboardToBlocks(data: DataTransfer): Block[] | null {
   const text = data.getData("text/plain");
   const html = data.getData("text/html");
 
-  if (text && looksLikeMarkdown(text)) return markdownToBlocks(text);
-  if (html && looksLikeRichHtml(html)) {
-    const blocks = htmlToBlocks(html);
-    if (blocks.length) return blocks;
-  }
+  const mdBlocks = text && looksLikeMarkdown(text) ? markdownToBlocks(text) : null;
+  const htmlBlocks = html && looksLikeRichHtml(html) ? htmlToBlocks(html) : [];
+
+  const htmlNest = maxIndentOf(htmlBlocks);
+  const mdNest = maxIndentOf(mdBlocks);
+
+  if (htmlBlocks.length && htmlNest > mdNest) return htmlBlocks;
+  if (mdBlocks?.length) return mdBlocks;
+  if (htmlBlocks.length) return htmlBlocks;
   if (text && looksLikeTsv(text)) return [tsvToBlock(text)];
   if (text && text.includes("\n") && /^\|.+\|/m.test(text)) {
     return markdownToBlocks(text);

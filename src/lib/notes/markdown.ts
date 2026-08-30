@@ -9,6 +9,14 @@ function tableMd(block: Block): string {
   return [line(headers), sep, ...rows.map(line)].join("\n");
 }
 
+function withIndent(block: Block, marker: string): string {
+  const pad = "  ".repeat(Math.max(0, block.indent ?? 0));
+  const lines = (block.content || "").split("\n");
+  const first = `${pad}${marker}${lines[0] ?? ""}`;
+  const rest = lines.slice(1).map((l) => `${pad}  ${l}`);
+  return [first, ...rest].join("\n");
+}
+
 export function blockToMarkdown(block: Block): string {
   const t = block.content;
   switch (block.type) {
@@ -19,11 +27,11 @@ export function blockToMarkdown(block: Block): string {
     case "h3":
       return `### ${t}`;
     case "ul":
-      return `- ${t}`;
+      return withIndent(block, "- ");
     case "ol":
-      return `1. ${t}`;
+      return withIndent(block, "1. ");
     case "todo":
-      return `- [${block.checked ? "x" : " "}] ${t}`;
+      return withIndent(block, `- [${block.checked ? "x" : " "}] `);
     case "code":
       return `\`\`\`${block.lang ?? ""}\n${t}\n\`\`\``;
     case "quote":

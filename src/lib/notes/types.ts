@@ -35,6 +35,8 @@ export type Block = {
   inner?: string;
   headers?: string[];
   rows?: string[][];
+  /** Nested list depth. 0 = top level. Used by ul / ol / todo. */
+  indent?: number;
 };
 
 export type PageIcon =

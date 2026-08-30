@@ -80,7 +80,7 @@ type NotesState = NotesSnapshot & {
   updatePage: (id: string, patch: Partial<Pick<Page, "title" | "icon" | "tags">>) => void;
   addTag: (id: string, tag: string) => void;
   removeTag: (id: string, tag: string) => void;
-  insertBlock: (pageId: string, afterId: string | null, type?: BlockType) => string;
+  insertBlock: (pageId: string, afterId: string | null, type?: BlockType, extra?: Partial<Block>) => string;
   insertBlocks: (pageId: string, afterId: string | null, incoming: Block[]) => void;
   replaceWithBlocks: (pageId: string, blockId: string, incoming: Block[]) => void;
   updateBlock: (pageId: string, blockId: string, patch: Partial<Block>) => void;
@@ -428,9 +428,9 @@ export const useNotes = create<NotesState>()(
           capture();
           get().updatePage(id, { tags: page.tags.filter((x) => x !== tag) });
         },
-        insertBlock: (pageId, afterId, type = "p") => {
+        insertBlock: (pageId, afterId, type = "p", extra) => {
           capture();
-          const block = emptyBlock(type);
+          const block = { ...emptyBlock(type), ...extra, id: nid(), type: extra?.type ?? type };
           set((s) => {
             const page = s.pages[pageId];
             if (!page) return s;

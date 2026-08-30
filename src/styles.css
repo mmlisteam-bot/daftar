@@ -217,6 +217,14 @@
   }
 }
 
+.list-guide {
+  border-inline-start: 1px solid color-mix(in oklab, var(--fg) 16%, transparent);
+}
+
+.dark .list-guide {
+  border-inline-start-color: color-mix(in oklab, var(--fg) 18%, transparent);
+}
+
 .hl-mark {
   background: color-mix(in oklab, #e4c35a 55%, transparent);
   color: inherit;

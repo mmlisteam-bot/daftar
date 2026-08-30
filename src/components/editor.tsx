@@ -180,7 +180,7 @@ async function pasteInto(
   pageId: string,
   block: Block,
   opts?: { allowStructured?: boolean },
-) {
+): Promise<boolean> {
   const file = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"))?.getAsFile();
   if (file) {
     e.preventDefault();
@@ -190,26 +190,55 @@ async function pasteInto(
     const next = emptyBlock("image");
     next.imageId = id;
     useNotes.getState().replaceBlock(pageId, block.id, { ...next, id: block.id });
-    return;
+    return true;
   }
-  if (opts?.allowStructured === false) return;
+  if (opts?.allowStructured === false) return false;
   const incoming = clipboardToBlocks(e.clipboardData);
-  if (!incoming) return;
+  if (!incoming) return false;
   e.preventDefault();
-  const empty =
-    !block.content.trim() && block.type !== "table" && block.type !== "image" && block.type !== "divider";
+  applyIncoming(pageId, block, incoming);
+  return true;
+}
+
+function applyIncoming(pageId: string, block: Block | null, incoming: Block[]) {
+  if (!incoming.length) return;
   const store = useNotes.getState();
-  if (empty) store.replaceWithBlocks(pageId, block.id, incoming);
-  else store.insertBlocks(pageId, block.id, incoming);
   const page = store.pages[pageId];
-  if (
-    page &&
-    /^(صفحه جدید|بدون عنوان)$/.test(page.title) &&
-    incoming[0]?.type === "h1" &&
-    incoming[0].content.trim()
-  ) {
-    store.updatePage(pageId, { title: incoming[0].content.trim() });
+  if (!page) return;
+  if (!block) {
+    const last = page.blocks.at(-1);
+    const empty =
+      last &&
+      !last.content.trim() &&
+      last.type !== "table" &&
+      last.type !== "image" &&
+      last.type !== "divider";
+    if (empty) store.replaceWithBlocks(pageId, last.id, incoming);
+    else store.insertBlocks(pageId, last?.id ?? null, incoming);
+  } else {
+    const empty =
+      !block.content.trim() && block.type !== "table" && block.type !== "image" && block.type !== "divider";
+    if (empty) store.replaceWithBlocks(pageId, block.id, incoming);
+    else store.insertBlocks(pageId, block.id, incoming);
   }
+  const next = store.pages[pageId];
+  if (next && /^(صفحه جدید|بدون عنوان)?$/.test(next.title.trim())) {
+    const first = incoming[0];
+    if (first?.type === "h1" && first.content.trim()) {
+      store.updatePage(pageId, { title: first.content.trim() });
+    } else {
+      const bold = first?.content.trim().match(/^\*\*(.+)\*\*$/);
+      if (bold?.[1]) store.updatePage(pageId, { title: bold[1] });
+    }
+  }
+}
+
+function guessDir(text: string): "ltr" | "rtl" | undefined {
+  const m = text.match(/\p{L}/u);
+  if (!m) return undefined;
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(m[0]!)
+    ? "rtl"
+    : "ltr";
 }
 
 function RichText({
@@ -267,7 +296,12 @@ function RichText({
           }
           onKeyDown?.(e);
         }}
-        onPaste={onPaste}
+        onPaste={(e) => {
+          onPaste?.(e);
+          queueMicrotask(() => {
+            if (e.defaultPrevented) setEditing(false);
+          });
+        }}
         onBlur={() => {
           if (value.trim() && !value.startsWith("/")) setEditing(false);
         }}
@@ -657,16 +691,33 @@ function BlockView({
     if (e.key === "/" && block.content === "") {
       onFocusSlash(block.id, e.currentTarget);
     }
+    const isList = block.type === "ul" || block.type === "ol" || block.type === "todo";
+    if (e.key === "Tab" && isList) {
+      e.preventDefault();
+      const cur = block.indent ?? 0;
+      updateBlock(pageId, block.id, {
+        indent: e.shiftKey ? Math.max(0, cur - 1) : Math.min(8, cur + 1),
+      });
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey && block.type !== "code" && block.type !== "toggle") {
       e.preventDefault();
-      const cont = block.type === "ul" || block.type === "ol" || block.type === "todo";
-      if (cont && block.content.trim() === "") {
-        replaceBlock(pageId, block.id, { ...block, type: "p", content: "" });
+      if (isList && block.content.trim() === "") {
+        if ((block.indent ?? 0) > 0) {
+          updateBlock(pageId, block.id, { indent: (block.indent ?? 0) - 1 });
+          return;
+        }
+        replaceBlock(pageId, block.id, { ...block, type: "p", content: "", indent: 0 });
         return;
       }
-      insertBlock(pageId, block.id, cont ? block.type : "p");
+      insertBlock(pageId, block.id, isList ? block.type : "p", isList ? { indent: block.indent ?? 0 } : undefined);
     }
     if (e.key === "Backspace" && block.content === "") {
+      if (isList && (block.indent ?? 0) > 0) {
+        e.preventDefault();
+        updateBlock(pageId, block.id, { indent: (block.indent ?? 0) - 1 });
+        return;
+      }
       e.preventDefault();
       removeBlock(pageId, block.id);
     }
@@ -891,15 +942,15 @@ function BlockView({
 
   const prefix =
     block.type === "ul" ? (
-      <span className="mt-2 w-4 text-muted">•</span>
+      <span className="mt-2 w-4 shrink-0 text-muted">•</span>
     ) : block.type === "ol" ? (
-      <span className="mt-2 w-4 text-muted">1.</span>
+      <span className="mt-2 w-4 shrink-0 text-muted">1.</span>
     ) : block.type === "todo" ? (
       <input
         type="checkbox"
         checked={!!block.checked}
         onChange={(e) => updateBlock(pageId, block.id, { checked: e.target.checked })}
-        className="mt-2 size-4 accent-accent"
+        className="mt-2 size-4 shrink-0 accent-accent"
       />
     ) : null;
 
@@ -908,8 +959,17 @@ function BlockView({
       ? headingAnchor(block.content)
       : undefined;
 
+  const indent = Math.max(0, block.indent ?? 0);
+  const isList = block.type === "ul" || block.type === "ol" || block.type === "todo";
+  const listDir = isList ? guessDir(block.content) : undefined;
+
   return shell(
-    <div className={cn("flex gap-2", typeClass)} data-heading={headingAttr}>
+    <div className={cn("flex gap-2", typeClass)} data-heading={headingAttr} dir={listDir}>
+      {isList && indent > 0
+        ? Array.from({ length: indent }, (_, i) => (
+            <span key={i} aria-hidden className="list-guide mt-0.5 w-5 shrink-0" />
+          ))
+        : null}
       {prefix}
       <div className="min-w-0 flex-1">
         {block.type === "callout" && block.callout ? (
@@ -1085,6 +1145,21 @@ export function Editor() {
     return () => window.clearTimeout(t);
   }, [scrollToBlock, currentId]);
 
+  useEffect(() => {
+    const onWinPaste = (e: globalThis.ClipboardEvent) => {
+      if (e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("textarea, input, [contenteditable='true'], [role='dialog']")) return;
+      if (!e.clipboardData) return;
+      const incoming = clipboardToBlocks(e.clipboardData);
+      if (!incoming) return;
+      e.preventDefault();
+      applyIncoming(currentId, null, incoming);
+    };
+    window.addEventListener("paste", onWinPaste);
+    return () => window.removeEventListener("paste", onWinPaste);
+  }, [currentId]);
+
   if (!page) {
     return <div className="p-10 text-muted">صفحه‌ای انتخاب نشده.</div>;
   }
@@ -1099,6 +1174,15 @@ export function Editor() {
     void file.text().then((md) => importMarkdown(page.id, md));
   }
 
+  function onPagePaste(e: ClipboardEvent<HTMLElement>) {
+    const t = e.target as HTMLElement | null;
+    if (t?.closest("textarea, input, [contenteditable='true']")) return;
+    const incoming = clipboardToBlocks(e.clipboardData);
+    if (!incoming) return;
+    e.preventDefault();
+    applyIncoming(page.id, null, incoming);
+  }
+
   return (
     <article
       className="print-wide mx-auto w-full max-w-3xl px-4 pt-8 pb-28 sm:px-8"
@@ -1106,6 +1190,7 @@ export function Editor() {
         if ([...e.dataTransfer.items].some((i) => i.kind === "file")) e.preventDefault();
       }}
       onDrop={onDropMd}
+      onPaste={onPagePaste}
     >
       <div className="no-print mb-4 flex flex-wrap items-center gap-1 text-[14px] text-muted">
         {crumbs.map((c, i) => (
