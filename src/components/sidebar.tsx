@@ -3,7 +3,6 @@ import {
   ChevronLeft,
   Copy,
   Heart,
-  History,
   LayoutTemplate,
   LogOut,
   Plus,
@@ -282,14 +281,12 @@ export function Sidebar({
   const pages = useNotes((s) => s.pages);
   const order = useNotes((s) => s.order);
   const trash = useNotes((s) => s.trash);
-  const recentIds = useNotes((s) => s.recentIds);
   const filterTag = useNotes((s) => s.filterTag);
   const setFilterTag = useNotes((s) => s.setFilterTag);
   const createPage = useNotes((s) => s.createPage);
   const createFromTemplate = useNotes((s) => s.createFromTemplate);
   const restorePage = useNotes((s) => s.restorePage);
   const dropForever = useNotes((s) => s.dropForever);
-  const setCurrent = useNotes((s) => s.setCurrent);
   const addTag = useNotes((s) => s.addTag);
   const movePage = useNotes((s) => s.movePage);
   const [tagQ, setTagQ] = useState("");
@@ -303,16 +300,6 @@ export function Sidebar({
       p.tags.includes(filterTag) || getChildren(pages, p.id).some(match);
     return list.filter(match);
   }, [order, pages, filterTag]);
-
-  const starred = useMemo(
-    () => Object.values(pages).filter((p) => p.starred),
-    [pages],
-  );
-
-  const recents = useMemo(
-    () => (recentIds ?? []).map((id) => pages[id]).filter(Boolean) as Page[],
-    [recentIds, pages],
-  );
 
   const trashList = useMemo(
     () =>
@@ -398,48 +385,6 @@ export function Sidebar({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-        {starred.length > 0 ? (
-          <div className="mb-3">
-            <div className="mb-1 px-1 text-[13px] font-medium text-subtle">محبوب‌ها</div>
-            {starred.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  setCurrent(p.id);
-                  onClose?.();
-                }}
-                className="flex min-h-9 w-full items-start gap-2 rounded-md px-2 py-1.5 text-[15px] leading-snug text-muted hover:bg-surface-2 hover:text-fg"
-              >
-                <Star className="mt-0.5 size-3.5 shrink-0 text-warn" fill="currentColor" />
-                <PageGlyph name={p.icon} className="mt-0.5 size-3.5 shrink-0 opacity-80" />
-                <span className="min-w-0 flex-1 whitespace-normal break-words">{p.title || "بدون عنوان"}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {recents.length > 0 ? (
-          <div className="mb-3">
-            <div className="mb-1 px-1 text-[13px] font-medium text-subtle">اخیر</div>
-            {recents.map((p) => (
-              <button
-                key={`r-${p.id}`}
-                type="button"
-                onClick={() => {
-                  setCurrent(p.id);
-                  onClose?.();
-                }}
-                className="flex min-h-9 w-full items-start gap-2 rounded-md px-2 py-1.5 text-[15px] leading-snug text-muted hover:bg-surface-2 hover:text-fg"
-              >
-                <History className="mt-0.5 size-3.5 shrink-0" />
-                <PageGlyph name={p.icon} className="mt-0.5 size-3.5 shrink-0 opacity-80" />
-                <span className="min-w-0 flex-1 whitespace-normal break-words">{p.title || "بدون عنوان"}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-
         <div
           className="mb-1 flex items-center justify-between rounded-md px-1"
           onDragOver={(e) => {
