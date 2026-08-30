@@ -6,7 +6,6 @@ import {
   LayoutTemplate,
   LogOut,
   Plus,
-  RotateCcw,
   Search,
   Share,
   Star,
@@ -17,7 +16,7 @@ import {
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { PageGlyph } from "@/components/page-icon";
 import { Button } from "@/components/ui/button";
-import { allTags, getChildren, trashDaysLeft, useNotes } from "@/lib/notes/store";
+import { getChildren, useNotes } from "@/lib/notes/store";
 import { PAGE_TEMPLATES } from "@/lib/notes/templates";
 import type { Page } from "@/lib/notes/types";
 import { cn } from "@/lib/utils";
@@ -280,18 +279,12 @@ export function Sidebar({
 }) {
   const pages = useNotes((s) => s.pages);
   const order = useNotes((s) => s.order);
-  const trash = useNotes((s) => s.trash);
   const filterTag = useNotes((s) => s.filterTag);
   const setFilterTag = useNotes((s) => s.setFilterTag);
   const createPage = useNotes((s) => s.createPage);
   const createFromTemplate = useNotes((s) => s.createFromTemplate);
-  const restorePage = useNotes((s) => s.restorePage);
-  const dropForever = useNotes((s) => s.dropForever);
-  const addTag = useNotes((s) => s.addTag);
   const movePage = useNotes((s) => s.movePage);
-  const [tagQ, setTagQ] = useState("");
   const [tplOpen, setTplOpen] = useState(false);
-  const [trashOpen, setTrashOpen] = useState(false);
 
   const roots = useMemo(() => {
     const list = order.map((id) => pages[id]).filter(Boolean) as Page[];
@@ -300,16 +293,6 @@ export function Sidebar({
       p.tags.includes(filterTag) || getChildren(pages, p.id).some(match);
     return list.filter(match);
   }, [order, pages, filterTag]);
-
-  const trashList = useMemo(
-    () =>
-      Object.values(trash ?? {}).sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0)),
-    [trash],
-  );
-
-  const tags = allTags(pages).filter((t) =>
-    tagQ.trim() ? t.tag.toLowerCase().includes(tagQ.trim().toLowerCase()) : true,
-  );
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col bg-surface">
@@ -416,100 +399,15 @@ export function Sidebar({
         {roots.map((p) => (
           <PageRow key={p.id} page={p} depth={0} compact={compact} onNavigate={onClose} />
         ))}
-
-        <div className="mt-5 px-1 text-[13px] font-medium text-subtle">تگ‌ها</div>
-        <input
-          value={tagQ}
-          onChange={(e) => setTagQ(e.target.value)}
-          placeholder="فیلتر تگ · صفحه را روی تگ رها کن"
-          className="mt-1 mb-1.5 h-9 w-full rounded-md border border-border bg-bg px-2 text-[14px] outline-none placeholder:text-subtle"
-        />
-        <div className="flex flex-wrap gap-1 px-0.5">
-          {tags.map(({ tag, count }) => {
-            const on = filterTag === tag;
-            return (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => setFilterTag(on ? null : tag)}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "copy";
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const id = readPageDrag(e);
-                  if (id) addTag(id, tag);
-                }}
-                className={cn(
-                  "rounded-full px-2.5 py-1 text-[13px] transition-colors",
-                  on ? "bg-accent text-accent-fg" : "bg-surface-2 text-muted hover:text-fg",
-                )}
-              >
-                {tag}
-                <span className="ms-1 opacity-70">{count}</span>
-              </button>
-            );
-          })}
-        </div>
         {filterTag ? (
           <button
             type="button"
-            className="mt-2 text-[11px] text-muted hover:text-fg"
+            className="mt-3 w-full rounded-md px-1 text-start text-[12px] text-muted hover:text-fg"
             onClick={() => setFilterTag(null)}
           >
-            پاک کردن فیلتر
+            فیلتر تگ «{filterTag}» · پاک کردن
           </button>
         ) : null}
-
-        <div className="mt-5">
-          <button
-            type="button"
-            className="flex h-9 w-full items-center gap-2 rounded-md px-1 text-[13px] font-medium text-subtle hover:text-fg"
-            onClick={() => setTrashOpen((v) => !v)}
-          >
-            <Trash2 className="size-3.5" />
-            سطل زباله
-            {trashList.length ? <span className="opacity-70">{trashList.length}</span> : null}
-          </button>
-          {trashOpen ? (
-            trashList.length === 0 ? (
-              <div className="px-2 py-2 text-[12px] text-subtle">خالی است. صفحات تا ۷ روز اینجا می‌مانند.</div>
-            ) : (
-              <div className="space-y-0.5">
-                {trashList.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center gap-1 rounded-md px-1 py-1 text-[12px] text-muted"
-                  >
-                    <PageGlyph name={p.icon} className="size-3.5 opacity-70" />
-                    <span className="min-w-0 flex-1 truncate">{p.title || "بدون عنوان"}</span>
-                    <span className="text-[10px] text-subtle">{trashDaysLeft(p.deletedAt ?? 0)}ر</span>
-                    <button
-                      type="button"
-                      className="flex size-6 items-center justify-center rounded hover:bg-surface-2 hover:text-fg"
-                      title="برگرداندن"
-                      onClick={() => restorePage(p.id)}
-                    >
-                      <RotateCcw className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className="flex size-6 items-center justify-center rounded hover:bg-surface-2 hover:text-danger"
-                      title="حذف دائمی"
-                      onClick={() => {
-                        if (confirm("برای همیشه حذف شود؟")) dropForever(p.id);
-                      }}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : null}
-        </div>
       </div>
       <InstallHint />
       {onLogout ? (

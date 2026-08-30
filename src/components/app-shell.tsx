@@ -10,6 +10,8 @@ import {
   Redo2,
   RotateCcw,
   Sun,
+  Tag,
+  Trash2,
   Undo2,
   Upload,
   Wand2,
@@ -21,6 +23,7 @@ import { Flashcards } from "@/components/flashcards";
 import { HadisWelcome } from "@/components/hadis-welcome";
 import { LoginScreen } from "@/components/login-screen";
 import { PayloadPanel } from "@/components/payload-panel";
+import { PageGlyph } from "@/components/page-icon";
 import { SearchDialog } from "@/components/search-dialog";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
@@ -28,7 +31,7 @@ import { applyBackupImages, downloadAllZip, downloadJsonBackup, parseBackupFile 
 import { SQLI_EXPAND, SQLI_REF_FLAG, applySqliRef } from "@/lib/notes/sqli-ref";
 import { downloadText, pageToMarkdown } from "@/lib/notes/markdown";
 import { getSession, logout, markHadisHelloSeen, setActiveUserId, shouldShowHadisHello, type SessionUser } from "@/lib/notes/session";
-import { useNotes } from "@/lib/notes/store";
+import { allTags, trashDaysLeft, useNotes } from "@/lib/notes/store";
 import type { NotesSnapshot } from "@/lib/notes/types";
 
 export function AppShell() {
@@ -82,8 +85,15 @@ function NotesWorkspace({
   const undo = useNotes((s) => s.undo);
   const redo = useNotes((s) => s.redo);
   const histRev = useNotes((s) => s.histRev);
+  const filterTag = useNotes((s) => s.filterTag);
+  const setFilterTag = useNotes((s) => s.setFilterTag);
+  const restorePage = useNotes((s) => s.restorePage);
+  const dropForever = useNotes((s) => s.dropForever);
+  const addTag = useNotes((s) => s.addTag);
   const [search, setSearch] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [tagMenu, setTagMenu] = useState(false);
+  const [trashMenu, setTrashMenu] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [payloads, setPayloads] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
@@ -185,6 +195,8 @@ function NotesWorkspace({
   const page = pages[currentId];
   const canUndo = histRev >= 0 && useNotes.getState().canUndo();
   const canRedo = histRev >= 0 && useNotes.getState().canRedo();
+  const tags = allTags(pages);
+  const trashList = Object.values(trash ?? {}).sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0));
 
   function convertMarkdownOnPage() {
     if (!page) return;
@@ -328,7 +340,16 @@ function NotesWorkspace({
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
           <div className="relative">
-            <Button variant="ghost" size="icon-sm" onClick={() => setMenu((v) => !v)} aria-label="خروجی">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => {
+                setMenu((v) => !v);
+                setTagMenu(false);
+                setTrashMenu(false);
+              }}
+              aria-label="خروجی"
+            >
               <Download className="size-4" />
             </Button>
             {menu ? (
@@ -432,6 +453,126 @@ function NotesWorkspace({
                     جزوه نمونه
                   </button>
                 ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => {
+                setTagMenu((v) => !v);
+                setMenu(false);
+                setTrashMenu(false);
+              }}
+              aria-label="تگ‌ها"
+              title="تگ‌ها"
+              className={filterTag ? "text-accent" : undefined}
+            >
+              <Tag className="size-4" />
+            </Button>
+            {tagMenu ? (
+              <div className="absolute end-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+                <div className="px-3 py-1.5 text-[11px] font-medium text-subtle">تگ‌ها</div>
+                {tags.length === 0 ? (
+                  <div className="px-3 py-2 text-[12px] text-subtle">هنوز تگی نیست. زیر عنوان صفحه بساز.</div>
+                ) : (
+                  tags.map(({ tag, count }) => {
+                    const on = filterTag === tag;
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={`flex w-full items-center gap-2 px-3 py-2 text-start text-[13px] hover:bg-surface-2 ${on ? "bg-surface-2 text-fg" : ""}`}
+                        onClick={() => {
+                          setFilterTag(on ? null : tag);
+                          setTagMenu(false);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "copy";
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const raw = e.dataTransfer.getData("text/plain");
+                          const id = raw.startsWith("daftar-page:") ? raw.slice("daftar-page:".length) : raw;
+                          if (id) addTag(id, tag);
+                        }}
+                      >
+                        <Tag className="size-3.5 shrink-0 opacity-70" />
+                        <span className="min-w-0 flex-1 truncate">{tag}</span>
+                        <span className="text-[11px] text-subtle">{count}</span>
+                      </button>
+                    );
+                  })
+                )}
+                {filterTag ? (
+                  <button
+                    type="button"
+                    className="flex w-full px-3 py-2 text-start text-[12px] text-muted hover:bg-surface-2 hover:text-fg"
+                    onClick={() => {
+                      setFilterTag(null);
+                      setTagMenu(false);
+                    }}
+                  >
+                    پاک کردن فیلتر
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => {
+                setTrashMenu((v) => !v);
+                setMenu(false);
+                setTagMenu(false);
+              }}
+              aria-label="سطل زباله"
+              title="سطل زباله"
+              className="relative"
+            >
+              <Trash2 className="size-4" />
+              {trashList.length ? (
+                <span className="absolute -end-0.5 -top-0.5 flex size-3.5 items-center justify-center rounded-full bg-danger text-[9px] text-white">
+                  {trashList.length > 9 ? "9+" : trashList.length}
+                </span>
+              ) : null}
+            </Button>
+            {trashMenu ? (
+              <div className="absolute end-0 z-20 mt-1 w-64 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+                <div className="px-3 py-1.5 text-[11px] font-medium text-subtle">سطل زباله · ۷ روز</div>
+                {trashList.length === 0 ? (
+                  <div className="px-3 py-2 text-[12px] text-subtle">خالی است.</div>
+                ) : (
+                  trashList.map((p) => (
+                    <div key={p.id} className="flex items-center gap-1 px-2 py-1.5 text-[13px] text-muted">
+                      <PageGlyph name={p.icon} className="size-3.5 shrink-0 opacity-70" />
+                      <span className="min-w-0 flex-1 truncate">{p.title || "بدون عنوان"}</span>
+                      <span className="text-[10px] text-subtle">{trashDaysLeft(p.deletedAt ?? 0)}ر</span>
+                      <button
+                        type="button"
+                        className="flex size-6 items-center justify-center rounded hover:bg-surface-2 hover:text-fg"
+                        title="برگرداندن"
+                        onClick={() => restorePage(p.id)}
+                      >
+                        <RotateCcw className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="flex size-6 items-center justify-center rounded hover:bg-surface-2 hover:text-danger"
+                        title="حذف دائمی"
+                        onClick={() => {
+                          if (confirm("برای همیشه حذف شود؟")) dropForever(p.id);
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             ) : null}
           </div>
