@@ -28,9 +28,9 @@ import { SearchDialog } from "@/components/search-dialog";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 import { applyBackupImages, downloadAllZip, downloadJsonBackup, parseBackupFile } from "@/lib/notes/backup";
-import { SQLI_EXPAND, SQLI_REF_FLAG, applySqliRef } from "@/lib/notes/sqli-ref";
+import { SQLI_REF_FLAG, applySqliRef } from "@/lib/notes/sqli-ref";
 import { downloadText, pageToMarkdown } from "@/lib/notes/markdown";
-import { getSession, logout, markHadisHelloSeen, setActiveUserId, shouldShowHadisHello, type SessionUser } from "@/lib/notes/session";
+import { getSession, logout, markHadisHelloSeen, notesStorageKey, setActiveUserId, shouldShowHadisHello, type SessionUser } from "@/lib/notes/session";
 import { allTags, trashDaysLeft, useNotes } from "@/lib/notes/store";
 import type { NotesSnapshot } from "@/lib/notes/types";
 
@@ -101,16 +101,19 @@ function NotesWorkspace({
   const [hadisHi, setHadisHi] = useState(() => shouldShowHadisHello(user.id));
 
   useEffect(() => {
-    primeWorkspace();
-    const done = () => setHydrated(true);
-    const maybe = useNotes.persist.rehydrate();
-    const inject = () => {
+    let live = true;
+    async function boot() {
+      setActiveUserId(user.id);
+      const stored = typeof localStorage !== "undefined" ? localStorage.getItem(notesStorageKey(user.id)) : null;
+      if (stored) {
+        await useNotes.persist.rehydrate();
+      } else {
+        primeWorkspace();
+      }
       useNotes.getState().purgeTrash();
-      if (user.id === "mmli") {
+      if (user.id === "mmli" && !localStorage.getItem(SQLI_REF_FLAG)) {
         const s = useNotes.getState();
-        const next = localStorage.getItem(SQLI_REF_FLAG)
-          ? { pages: s.pages, order: s.order, expanded: { ...s.expanded, ...SQLI_EXPAND } }
-          : applySqliRef(s.pages, s.order, s.expanded);
+        const next = applySqliRef(s.pages, s.order, s.expanded);
         useNotes.setState({
           pages: next.pages,
           order: next.order,
@@ -118,14 +121,13 @@ function NotesWorkspace({
         });
         localStorage.setItem(SQLI_REF_FLAG, "1");
       }
-      done();
-    };
-    if (maybe && typeof (maybe as Promise<void>).then === "function") {
-      void (maybe as Promise<void>).then(inject, inject);
-    } else {
-      inject();
+      if (live) setHydrated(true);
     }
-  }, [setHydrated, primeWorkspace]);
+    void boot();
+    return () => {
+      live = false;
+    };
+  }, [setHydrated, primeWorkspace, user.id]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -246,6 +248,14 @@ function NotesWorkspace({
   function closeBackup() {
     sessionStorage.setItem(`daftar-backup-nag:${user.id}`, "1");
     setBackupOpen(false);
+  }
+
+  if (!hydrated) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-bg text-[14px] text-muted">
+        در حال خواندن دفتر…
+      </div>
+    );
   }
 
   return (

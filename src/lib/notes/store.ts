@@ -653,11 +653,10 @@ export const useNotes = create<NotesState>()(
         primeWorkspace: () => {
           clearHistory();
           const fresh = workspaceForUser();
-          set({
+          set((s) => ({
             pages: fresh.pages,
             order: fresh.order,
             currentId: fresh.order[0]!,
-            theme: "dark",
             expanded: getActiveUserId() === "hadis" ? {} : { ...SQLI_EXPAND },
             filterTag: null,
             hydrated: false,
@@ -665,7 +664,8 @@ export const useNotes = create<NotesState>()(
             trash: {},
             scrollToBlock: null,
             recentIds: [],
-          });
+            theme: s.theme,
+          }));
         },
         undo: () => {
           if (!past.length) return;
