@@ -21,5 +21,6 @@ export const PAGE = {
   sqliCheat: "p-sqli-cheat",
   sqliCheck: "p-sqli-check",
   xss: "p-xss",
+  js: "p-js",
   authn: "p-auth",
 } as const;

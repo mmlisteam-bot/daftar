@@ -1,4 +1,4 @@
-const CACHE = "daftar-shell-v3";
+const CACHE = "daftar-shell-v4";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
