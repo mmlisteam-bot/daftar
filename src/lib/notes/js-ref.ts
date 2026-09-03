@@ -1,6 +1,7 @@
 import { PAGE } from "./ids";
 import { markdownToBlocks } from "./parse";
 import type { Block, Page, PageIcon } from "./types";
+import jsVulnsMd from "./js-vulns.md?raw";
 
 export const JS_REF_FLAG = "daftar-js-ref-v1";
 
@@ -120,11 +121,25 @@ function wikiList(titles: string[]): string {
   return titles.map((t) => `- [[${t}]]`).join("\n");
 }
 
+export function stripFrontmatter(raw: string): string {
+  const s = String(raw ?? "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n");
+  if (!s.startsWith("---")) return s;
+  const end = s.indexOf("\n---", 3);
+  if (end < 0) return s;
+  return s.slice(end + 4).replace(/^\n+/, "");
+}
+
+export function jsVulnsSource(): string {
+  return stripFrontmatter(jsVulnsMd);
+}
+
 const TAGS = ["JavaScript", "Client-Side", "جزوه"];
 
-export function createJsRefPages(rawMarkdown: string): Record<string, Page> {
+export function createJsRefPages(rawMarkdown: string = jsVulnsSource()): Record<string, Page> {
   const pages: Record<string, Page> = {};
-  const raw = String(rawMarkdown ?? "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+  const raw = stripFrontmatter(rawMarkdown);
   const h1 = splitByHeading(raw, 1);
   if (!h1.length) return pages;
 
@@ -142,12 +157,10 @@ export function createJsRefPages(rawMarkdown: string): Record<string, Page> {
     "",
     "## فهرست بخش‌ها",
     "",
-    wikiList(chapterMeta.map((c) => c.title)),
+    wikiList(["انواع داده و عملگرها", ...chapterMeta.map((c) => c.title)]),
     "",
     "> [!tip]",
-    "> روی هر عنوان در سایدبار یا کارت زیرصفحه بزن. زیرشاخه‌ها همان تیترهای جزوه هستند.",
-    "",
-    "لب تعاملی همین جزوه: [خانه چراغک](https://mmlisteam-bot.github.io/js-lab/)",
+    "> روی هر عنوان در سایدبار یا لینک [[ ]] بزن. زیرشاخه‌ها همان تیترهای جزوه هستند.",
   ].join("\n");
 
   pages[PAGE.js] = pageOf(PAGE.js, "جاوااسکریپت", "code", [...TAGS, "مرجع"], null, 40, rootBody, {
@@ -184,32 +197,28 @@ export function applyJsRef(
   pages: Record<string, Page>,
   order: string[],
   expanded: Record<string, boolean>,
-  rawMarkdown: string,
+  rawMarkdown: string = jsVulnsSource(),
+  goneIds: string[] = [],
 ): { pages: Record<string, Page>; order: string[]; expanded: Record<string, boolean> } {
+  const gone = new Set(goneIds);
+  if (gone.has(PAGE.js)) {
+    return { pages, order, expanded };
+  }
   const ref = createJsRefPages(rawMarkdown);
-  const nextPages = { ...pages, ...ref };
-  const nextOrder = [...order];
-  if (!nextOrder.includes(PAGE.js)) {
-    const after = nextOrder.indexOf(PAGE.xss);
-    if (after >= 0) nextOrder.splice(after, 0, PAGE.js);
-    else {
-      const sqli = nextOrder.indexOf(PAGE.sqli);
-      nextOrder.splice(sqli >= 0 ? sqli + 1 : nextOrder.length, 0, PAGE.js);
-    }
+  const nextPages = { ...pages };
+  for (const [id, p] of Object.entries(ref)) {
+    if (gone.has(id)) continue;
+    if (p.parentId && gone.has(p.parentId)) continue;
+    nextPages[id] = p;
+  }
+  const nextOrder = order.filter((id) => id !== PAGE.jsTypes && !gone.has(id));
+  if (!nextOrder.includes(PAGE.js) && !gone.has(PAGE.js)) {
+    const home = nextOrder.indexOf(PAGE.home);
+    nextOrder.splice(home >= 0 ? home + 1 : 0, 0, PAGE.js);
   }
   return {
     pages: nextPages,
     order: nextOrder,
     expanded: { ...expanded, ...JS_EXPAND },
   };
-}
-
-export async function loadJsNotesMarkdown(): Promise<string | null> {
-  try {
-    const res = await fetch("./js-notes.md");
-    if (!res.ok) return null;
-    return await res.text();
-  } catch {
-    return null;
-  }
 }

@@ -5,6 +5,7 @@ import { pageBody } from "./markdown";
 import { createSeed } from "./seed";
 import { getActiveUserId } from "./session";
 import { SQLI_EXPAND } from "./sqli-ref";
+import { JS_EXPAND } from "./js-ref";
 import { pageFromTemplate, type PageTemplate } from "./templates";
 import {
   emptyBlock,
@@ -28,7 +29,7 @@ function workspaceForUser() {
   return getActiveUserId() === "hadis" ? blankWorkspace() : createSeed();
 }
 
-type Slice = Pick<NotesSnapshot, "pages" | "order" | "currentId" | "expanded" | "trash">;
+type Slice = Pick<NotesSnapshot, "pages" | "order" | "currentId" | "expanded" | "trash" | "goneIds">;
 
 const TRASH_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -46,6 +47,7 @@ function cloneSlice(s: Slice): Slice {
       currentId: s.currentId,
       expanded: s.expanded,
       trash: s.trash ?? {},
+      goneIds: [...(s.goneIds ?? [])],
     }),
   ) as Slice;
 }
@@ -64,6 +66,7 @@ type NotesState = NotesSnapshot & {
   scrollToBlock: string | null;
   trash: Record<string, Page>;
   recentIds: string[];
+  goneIds: string[];
   setHydrated: (v: boolean) => void;
   setTheme: (t: "dark" | "light") => void;
   setCurrent: (id: string, blockId?: string | null) => void;
@@ -193,15 +196,16 @@ export const useNotes = create<NotesState>()(
       return {
         pages: seed.pages,
         order: seed.order,
-        currentId: seed.order[0]!,
-        theme: "dark",
-        expanded: { ...SQLI_EXPAND },
+        currentId: seed.pages["p-js-types"] ? "p-js-types" : seed.order[0]!,
+        theme: "light",
+        expanded: { ...SQLI_EXPAND, ...JS_EXPAND },
         filterTag: null,
         hydrated: false,
         histRev: 0,
         scrollToBlock: null,
         trash: {},
         recentIds: [],
+        goneIds: [],
         setHydrated: (v) => set({ hydrated: v }),
         setTheme: (theme) => set({ theme }),
         setCurrent: (id, blockId) => {
@@ -256,7 +260,7 @@ export const useNotes = create<NotesState>()(
           return page.id;
         },
         deletePage: (id) => {
-          const { pages, order, currentId, trash } = get();
+          const { pages, order, currentId, trash, goneIds } = get();
           if (!pages[id] || Object.keys(pages).length <= 1) return;
           capture();
           const ids = [id, ...descendants(pages, id)];
@@ -280,6 +284,7 @@ export const useNotes = create<NotesState>()(
             currentId: nextCurrent,
             trash: nextTrash,
             recentIds: get().recentIds.filter((x) => !ids.includes(x)),
+            goneIds: [...new Set([...(goneIds ?? []), ...ids])],
           });
         },
         restorePage: (id) => {
@@ -303,6 +308,7 @@ export const useNotes = create<NotesState>()(
             order: nextOrder,
             trash: nextTrash,
             currentId: restored.id,
+            goneIds: (get().goneIds ?? []).filter((x) => x !== restored.id),
             expanded: restored.parentId
               ? { ...get().expanded, [restored.parentId]: true }
               : get().expanded,
@@ -607,6 +613,7 @@ export const useNotes = create<NotesState>()(
             expanded: data.expanded ?? {},
             trash: data.trash ?? {},
             recentIds: data.recentIds ?? get().recentIds,
+            goneIds: data.goneIds ?? get().goneIds ?? [],
           });
         },
         importMarkdown: (pageId, md) => {
@@ -645,9 +652,10 @@ export const useNotes = create<NotesState>()(
             pages: fresh.pages,
             order: fresh.order,
             currentId: fresh.order[0]!,
-            expanded: getActiveUserId() === "hadis" ? {} : { ...SQLI_EXPAND },
+            expanded: getActiveUserId() === "hadis" ? {} : { ...SQLI_EXPAND, ...JS_EXPAND },
             filterTag: null,
             trash: {},
+            goneIds: [],
           });
         },
         primeWorkspace: () => {
@@ -656,12 +664,13 @@ export const useNotes = create<NotesState>()(
           set((s) => ({
             pages: fresh.pages,
             order: fresh.order,
-            currentId: fresh.order[0]!,
-            expanded: getActiveUserId() === "hadis" ? {} : { ...SQLI_EXPAND },
+            currentId: fresh.pages["p-js-types"] ? "p-js-types" : fresh.order[0]!,
+            expanded: getActiveUserId() === "hadis" ? {} : { ...SQLI_EXPAND, ...JS_EXPAND },
             filterTag: null,
-            hydrated: false,
+            hydrated: true,
             histRev: 0,
             trash: {},
+            goneIds: [],
             scrollToBlock: null,
             recentIds: [],
             theme: s.theme,
@@ -710,6 +719,7 @@ export const useNotes = create<NotesState>()(
         expanded: s.expanded,
         trash: s.trash ?? {},
         recentIds: s.recentIds ?? [],
+        goneIds: s.goneIds ?? [],
       }),
     },
   ),

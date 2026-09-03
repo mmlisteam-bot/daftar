@@ -74,6 +74,8 @@ export type NotesSnapshot = {
   expanded: Record<string, boolean>;
   trash?: Record<string, Page>;
   recentIds?: string[];
+  /** Seed pages the user deleted — never auto-inject again. */
+  goneIds?: string[];
 };
 
 export function nid(): string {

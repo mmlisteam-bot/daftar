@@ -1,7 +1,8 @@
 import { ChevronDown } from "lucide-react";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { HighlightedCode } from "@/lib/notes/highlight";
+import { CodeCard } from "@/lib/notes/highlight";
 import { headingAnchor, InlineMd } from "@/lib/notes/inline";
+import { markdownToBlocks, promoteLooseCode } from "@/lib/notes/parse";
 import { getImageBlob } from "@/lib/notes/images";
 import { useNotes } from "@/lib/notes/store";
 import { blockToMarkdown, pageBody } from "@/lib/notes/markdown";
@@ -218,7 +219,7 @@ function FlowBlock({ pageId, block }: { pageId: string; block: Block }) {
   if (block.type === "code") {
     return (
       <div data-block={block.id} className="code-block my-3 overflow-hidden rounded-md" dir="ltr">
-        <HighlightedCode code={block.content} lang={block.lang} />
+        <CodeCard code={block.content} lang={block.lang} />
       </div>
     );
   }
@@ -376,7 +377,7 @@ export function DocView({ page }: { page: Page }) {
   }
   return (
     <FoldCtx.Provider value={fold}>
-      <Flow pageId={page.id} blocks={page.blocks} />
+      <Flow pageId={page.id} blocks={promoteLooseCode(page.blocks)} />
     </FoldCtx.Provider>
   );
 }

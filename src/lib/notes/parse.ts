@@ -60,6 +60,69 @@ export function normalizeLang(raw?: string | null): string {
   return LANG_ALIAS[v] ?? v;
 }
 
+export function looksLikeCodeLine(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  if (/^(\/\/|\/\*|\*\/|\*\s|#\s|--\s)/.test(t)) return true;
+  if (
+    /^(let|const|var|function|class|import|export|return|if|else|for|while|switch|case|break|continue|try|catch|finally|throw|new|typeof|await|async|yield|from)\b/.test(
+      t,
+    )
+  )
+    return true;
+  if (/^(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|UNION|CREATE|DROP|ALTER)\b/i.test(t)) return true;
+  if (/^(<\/?[a-zA-Z!]|<!DOCTYPE)/.test(t)) return true;
+  if (/^[a-zA-Z_$][\w$]*\s*[=(]/.test(t) && /[;{}()[\]]/.test(t)) return true;
+  if (/[{};]$/.test(t) && /[=()[\]{}]/.test(t) && /[A-Za-z]/.test(t)) return true;
+  if (/^[\w$.]+\(.*\)\s*;?$/.test(t)) return true;
+  return false;
+}
+
+export function looksLikeCodeText(text: string): boolean {
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (!lines.length) return false;
+  if (lines.length === 1) return looksLikeCodeLine(lines[0]!);
+  const hits = lines.filter(looksLikeCodeLine).length;
+  return hits >= Math.max(2, Math.ceil(lines.length * 0.55));
+}
+
+export function guessCodeLang(text: string): string {
+  if (/^\s*(SELECT|INSERT|UPDATE|DELETE|UNION|FROM)\b/im.test(text)) return "sql";
+  if (/^\s*(GET|POST|PUT|PATCH|DELETE|HEAD)\s+\S+/m.test(text) && /HTTP\//.test(text)) return "http";
+  if (/^\s*(def |class |import |from .+ import|print\()/m.test(text) && !/\blet |\bconst |\bvar /.test(text))
+    return "python";
+  if (/^\s*(#!\/bin\/|echo |curl |sudo )/m.test(text)) return "bash";
+  if (/^\s*(<\?php|function |echo )/m.test(text) && /\$\w/.test(text)) return "php";
+  if (/^\s*[{[]/.test(text.trim()) && /":/.test(text)) return "json";
+  return "javascript";
+}
+
+export function promoteLooseCode(blocks: Block[]): Block[] {
+  const out: Block[] = [];
+  let i = 0;
+  while (i < blocks.length) {
+    const b = blocks[i]!;
+    if (b.type === "p" && looksLikeCodeText(b.content)) {
+      const parts: string[] = [];
+      while (i < blocks.length && blocks[i]!.type === "p" && looksLikeCodeText(blocks[i]!.content)) {
+        parts.push(blocks[i]!.content);
+        i += 1;
+      }
+      const joined = parts.join("\n\n");
+      out.push(blk("code", joined, { lang: guessCodeLang(joined) }));
+      continue;
+    }
+    out.push(b);
+    i += 1;
+  }
+  return out;
+}
+
+
 function blk(type: Block["type"], content = "", extra: Partial<Block> = {}): Block {
   return { ...emptyBlock(type), id: nid(), content, ...extra };
 }
@@ -315,7 +378,7 @@ export function markdownToBlocks(src: string): Block[] {
   }
   flushPara();
   const result = out.length ? out : [blk("p")];
-  return compressListIndents(result);
+  return promoteLooseCode(compressListIndents(result));
 }
 
 function looksLikeRichHtml(html: string): boolean {

@@ -1,4 +1,6 @@
 import { PAGE } from "./ids";
+import { createJsRefPages } from "./js-ref";
+import { createJsTypesPage } from "./js-types";
 import { createSqliRefPages } from "./sqli-ref";
 import type { Block, BlockType, Page } from "./types";
 
@@ -56,7 +58,7 @@ export function createSeed(): { pages: Record<string, Page>; order: string[] } {
       blk("h2", "نمونه ساختار کلاس"),
       blk(
         "p",
-        "جزوه HTTP و مرجع کامل «SQL Injection صفر تا صد» به‌صورت صفحه و زیرصفحه آمده‌اند. از محبوب‌ها یا تگ SQL Injection وارد مرجع شو.",
+        "جزوه HTTP، مرجع «SQL Injection صفر تا صد»، و درخت «جاوااسکریپت» (انواع داده + آسیب‌پذیری سمت کلاینت) به‌صورت صفحه و زیرصفحه آمده‌اند.",
       ),
     ],
   );
@@ -192,6 +194,8 @@ export function createSeed(): { pages: Record<string, Page>; order: string[] } {
   );
 
   Object.assign(pages, createSqliRefPages());
+  Object.assign(pages, createJsRefPages());
+  pages[PAGE.jsTypes] = createJsTypesPage();
 
   pages[PAGE.xss] = page(
     PAGE.xss,
@@ -226,6 +230,6 @@ export function createSeed(): { pages: Record<string, Page>; order: string[] } {
 
   return {
     pages,
-    order: [PAGE.home, PAGE.http, PAGE.sqli, PAGE.xss, PAGE.authn],
+    order: [PAGE.home, PAGE.js, PAGE.http, PAGE.sqli, PAGE.xss, PAGE.authn],
   };
 }

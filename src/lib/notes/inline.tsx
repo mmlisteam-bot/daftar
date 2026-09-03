@@ -28,8 +28,10 @@ function splitInline(src: string): Seg[] {
       out.push({ k: "code", v: t.slice(1, -1) });
     } else if (t.startsWith("[[") && t.endsWith("]]")) {
       const inner = t.slice(2, -2);
-      const target = inner.replace(/^#[^\s]*\s*/, "").trim() || inner;
-      out.push({ k: "wiki", v: inner, target });
+      const [hrefPart, alias] = inner.split("|");
+      const target = (hrefPart ?? "").replace(/^#/, "").trim() || inner;
+      const label = (alias ?? inner.replace(/^#/, "")).trim();
+      out.push({ k: "wiki", v: label, target });
     } else if (t.startsWith("[")) {
       const mm = t.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (mm) out.push({ k: "a", v: mm[1] ?? "", href: mm[2] ?? "" });
@@ -110,7 +112,7 @@ export function InlineMd({
                     onWiki?.(seg.target);
                   }}
                 >
-                  {seg.target}
+                  {seg.v}
                 </button>
               );
             }

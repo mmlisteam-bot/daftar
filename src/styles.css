@@ -43,11 +43,13 @@
   --info: #2c5d7a;
   --warn: #9a5b12;
   --ok: #2f6a45;
-  --syn-kw: #b31d4a;
-  --syn-str: #1f7a3a;
-  --syn-cm: #8a8378;
-  --syn-num: #2f4fbf;
-  --code-bg: #efe6d4;
+  --syn-kw: #9b2fae;
+  --syn-str: #2e7d32;
+  --syn-cm: #6a6a6a;
+  --syn-num: #e65100;
+  --syn-fn: #795548;
+  --code-bg: #ffffff;
+  --code-border: #cfcfcf;
 }
 
 .dark {
@@ -66,9 +68,11 @@
   --ok: #8fbf9d;
   --syn-kw: #e391b0;
   --syn-str: #8fbf9d;
-  --syn-cm: #6e675c;
-  --syn-num: #9db4e0;
+  --syn-cm: #8a8378;
+  --syn-num: #e0a06a;
+  --syn-fn: #e0b080;
   --code-bg: #181613;
+  --code-border: #3a362f;
 }
 
 @layer base {
@@ -293,18 +297,63 @@
 }
 
 .code-block {
+  background: transparent;
+}
+
+.code-card {
+  position: relative;
   background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  overflow: hidden;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+  box-shadow: 0 1px 2px color-mix(in oklab, #000 6%, transparent);
+}
+
+.code-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: #9a9a9a;
+  background: transparent;
+}
+
+.code-copy:hover,
+.code-copy:focus-visible {
+  color: var(--fg);
+  background: color-mix(in oklab, var(--fg) 8%, transparent);
 }
 
 .code-pre {
   margin: 0;
-  padding: 12px 14px;
+  padding: 16px 44px 16px 16px;
   overflow-x: auto;
   font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.55;
   text-align: left;
+  direction: ltr;
+  unicode-bidi: isolate;
   white-space: pre;
+  tab-size: 2;
+}
+
+.code-pre code {
+  display: block;
+  font-family: inherit;
+  font-size: inherit;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
 }
 
 .tok-kw {
@@ -316,9 +365,13 @@
 }
 .tok-cm {
   color: var(--syn-cm);
+  font-style: italic;
 }
 .tok-num {
   color: var(--syn-num);
+}
+.tok-fn {
+  color: var(--syn-fn);
 }
 
 .note-table th,

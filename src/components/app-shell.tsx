@@ -31,6 +31,9 @@ import { applyBackupImages, downloadAllZip, downloadJsonBackup, parseBackupFile 
 import { SQLI_REF_FLAG, applySqliRef } from "@/lib/notes/sqli-ref";
 import { downloadText, pageToMarkdown } from "@/lib/notes/markdown";
 import { getSession, logout, markHadisHelloSeen, notesStorageKey, setActiveUserId, shouldShowHadisHello, type SessionUser } from "@/lib/notes/session";
+import { applyJsTypes, findStubJsTypes, isOutdatedJsTypes, JS_TYPES_FLAG } from "@/lib/notes/js-types";
+import { applyJsRef, JS_REF_FLAG } from "@/lib/notes/js-ref";
+import { PAGE } from "@/lib/notes/ids";
 import { allTags, trashDaysLeft, useNotes } from "@/lib/notes/store";
 import type { NotesSnapshot } from "@/lib/notes/types";
 
@@ -111,15 +114,61 @@ function NotesWorkspace({
         primeWorkspace();
       }
       useNotes.getState().purgeTrash();
+      const gone = new Set(useNotes.getState().goneIds ?? []);
       if (user.id === "mmli" && !localStorage.getItem(SQLI_REF_FLAG)) {
+        if (!gone.has(PAGE.sqli)) {
+          const s = useNotes.getState();
+          const next = applySqliRef(s.pages, s.order, s.expanded);
+          useNotes.setState({
+            pages: next.pages,
+            order: next.order,
+            expanded: next.expanded,
+          });
+        }
+        localStorage.setItem(SQLI_REF_FLAG, "1");
+      }
+      if (user.id === "mmli" && !localStorage.getItem(JS_REF_FLAG) && !gone.has(PAGE.js)) {
         const s = useNotes.getState();
-        const next = applySqliRef(s.pages, s.order, s.expanded);
+        const next = applyJsRef(s.pages, s.order, s.expanded, undefined, [...gone]);
         useNotes.setState({
           pages: next.pages,
           order: next.order,
           expanded: next.expanded,
         });
-        localStorage.setItem(SQLI_REF_FLAG, "1");
+        localStorage.setItem(JS_REF_FLAG, "1");
+      } else if (user.id === "mmli" && gone.has(PAGE.js)) {
+        localStorage.setItem(JS_REF_FLAG, "1");
+      }
+      if (user.id === "mmli") {
+        const s = useNotes.getState();
+        const goneNow = new Set(s.goneIds ?? []);
+        const stub = findStubJsTypes(s.pages);
+        const existing = stub ?? s.pages[PAGE.jsTypes];
+        const flagged = Boolean(localStorage.getItem(JS_TYPES_FLAG));
+        const targetId = existing?.id ?? PAGE.jsTypes;
+        if (goneNow.has(targetId) || (existing && goneNow.has(existing.id))) {
+          localStorage.setItem(JS_TYPES_FLAG, "1");
+        } else if (existing && isOutdatedJsTypes(existing)) {
+          const next = applyJsTypes(s.pages, s.order, s.expanded, existing.id);
+          useNotes.setState({
+            pages: next.pages,
+            order: next.order,
+            expanded: next.expanded,
+            currentId: existing.id,
+          });
+          localStorage.setItem(JS_TYPES_FLAG, "1");
+        } else if (!flagged) {
+          if (!existing) {
+            const next = applyJsTypes(s.pages, s.order, s.expanded);
+            useNotes.setState({
+              pages: next.pages,
+              order: next.order,
+              expanded: next.expanded,
+              currentId: PAGE.jsTypes,
+            });
+          }
+          localStorage.setItem(JS_TYPES_FLAG, "1");
+        }
       }
       if (live) setHydrated(true);
     }

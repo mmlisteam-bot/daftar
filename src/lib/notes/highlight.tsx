@@ -1,12 +1,18 @@
+import { Check, Copy } from "lucide-react";
+import { useState } from "react";
 import { normalizeLang } from "./parse";
 
-type Kind = "kw" | "str" | "cm" | "num" | "plain";
+type Kind = "kw" | "str" | "cm" | "num" | "fn" | "plain";
 
 type Rule = { kind: Kind; re: RegExp };
 
 function rules(lang: string): Rule[] {
-  const str = { kind: "str" as const, re: /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/y };
-  const num = { kind: "num" as const, re: /\b\d+(?:\.\d+)?\b/y };
+  const str = { kind: "str" as const, re: /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/y };
+  const num = { kind: "num" as const, re: /\b\d+(?:\.\d+)?n?\b/y };
+  const fnJs = {
+    kind: "fn" as const,
+    re: /\b(?:BigInt|Date|Array|Object|String|Number|Boolean|JSON|Math|Promise|Map|Set|WeakMap|WeakSet|Symbol|Proxy|Reflect|parseInt|parseFloat|isNaN|isFinite|encodeURI|decodeURI|setTimeout|setInterval|console)\b/y,
+  };
   switch (lang) {
     case "sql":
       return [
@@ -43,6 +49,7 @@ function rules(lang: string): Rule[] {
           kind: "kw",
           re: /\b(?:def|class|return|if|elif|else|for|while|import|from|as|try|except|with|pass|True|False|None|in|not|and|or|lambda|yield)\b/y,
         },
+        { kind: "fn", re: /\b(?:print|len|range|int|str|list|dict|set|tuple|open|input)\b/y },
         num,
       ];
     case "javascript":
@@ -51,8 +58,9 @@ function rules(lang: string): Rule[] {
         str,
         {
           kind: "kw",
-          re: /\b(?:const|let|var|function|return|if|else|for|while|class|import|from|export|async|await|new|this|true|false|null|undefined)\b/y,
+          re: /\b(?:const|let|var|function|return|if|else|for|while|class|import|from|export|async|await|new|this|true|false|null|undefined|typeof|instanceof|in|of|break|continue|switch|case|default|try|catch|finally|throw|yield|delete|void)\b/y,
         },
+        fnJs,
         num,
       ];
     case "json":
@@ -72,6 +80,7 @@ function rules(lang: string): Rule[] {
       return [
         { kind: "cm", re: /\/\/[^\n]*|#[^\n]*|--[^\n]*/y },
         str,
+        fnJs,
         num,
       ];
   }
@@ -121,5 +130,28 @@ export function HighlightedCode({ code, lang }: { code: string; lang?: string })
         )}
       </code>
     </pre>
+  );
+}
+
+export function CodeCard({ code, lang }: { code: string; lang?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="code-card" dir="ltr" lang="en">
+      <button type="button" className="code-copy no-print" onClick={() => void copy()} aria-label="Copy code" title="Copy">
+        {copied ? <Check className="size-3.5" strokeWidth={2} /> : <Copy className="size-3.5" strokeWidth={2} />}
+      </button>
+      <HighlightedCode code={code} lang={lang} />
+    </div>
   );
 }
