@@ -181,7 +181,8 @@ export const JS_EXPAND: Record<string, boolean> = {
 };
 
 export function applyJsRef(
-  pages: Record<string, Page>,n  order: string[],
+  pages: Record<string, Page>,
+  order: string[],
   expanded: Record<string, boolean>,
   rawMarkdown: string,
 ): { pages: Record<string, Page>; order: string[]; expanded: Record<string, boolean> } {
