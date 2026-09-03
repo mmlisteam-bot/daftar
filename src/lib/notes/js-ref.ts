@@ -1,4 +1,3 @@
-import jsNotes from "./js-notes.md?raw";
 import { PAGE } from "./ids";
 import { markdownToBlocks } from "./parse";
 import type { Block, Page, PageIcon } from "./types";
@@ -64,7 +63,7 @@ function iconFor(title: string): PageIcon {
   if (/dom|bom|http|web/.test(t)) return "globe";
   if (/ajax|fetch|cors|postmessage|recon|ابزار/.test(t)) return "network";
   if (/csrf|auth|session|cookie|samesite/.test(t)) return "lock";
-  if (/sop|cors|unicode|normalization|defense|دفاع|protection/.test(t)) return "shield";
+  if (/sop|unicode|normalization|defense|دفاع|protection/.test(t)) return "shield";
   if (/xss|inject|آلود|تزریق|hijack|bypass|waf|pollution/.test(t)) return "bug";
   if (/sql|دیتابیس/.test(t)) return "database";
   if (/ابزار|tool|sqlmap|terminal|practice|تمرین/.test(t)) return "terminal";
@@ -123,9 +122,9 @@ function wikiList(titles: string[]): string {
 
 const TAGS = ["JavaScript", "Client-Side", "جزوه"];
 
-export function createJsRefPages(): Record<string, Page> {
+export function createJsRefPages(rawMarkdown: string): Record<string, Page> {
   const pages: Record<string, Page> = {};
-  const raw = String(jsNotes).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+  const raw = String(rawMarkdown ?? "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
   const h1 = splitByHeading(raw, 1);
   if (!h1.length) return pages;
 
@@ -151,28 +150,15 @@ export function createJsRefPages(): Record<string, Page> {
     "لب تعاملی همین جزوه: [خانه چراغک](https://mmlisteam-bot.github.io/js-lab/)",
   ].join("\n");
 
-  pages[PAGE.js] = pageOf(
-    PAGE.js,
-    "جاوااسکریپت",
-    "code",
-    [...TAGS, "مرجع"],
-    null,
-    40,
-    rootBody,
-    { starred: true },
-  );
+  pages[PAGE.js] = pageOf(PAGE.js, "جاوااسکریپت", "code", [...TAGS, "مرجع"], null, 40, rootBody, {
+    starred: true,
+  });
 
-  chapterMeta.forEach((ch) => {
+  for (const ch of chapterMeta) {
     const subs = splitByHeading(ch.body, 2);
     const beforeFirstH2 = ch.body.split(/^## /m)[0]?.trim() ?? "";
     if (subs.length >= 2) {
-      const sectionBody = [
-        beforeFirstH2,
-        "",
-        "## زیرشاخه‌ها",
-        "",
-        wikiList(subs.map((s) => s.title)),
-      ]
+      const sectionBody = [beforeFirstH2, "", "## زیرشاخه‌ها", "", wikiList(subs.map((s) => s.title))]
         .join("\n")
         .trim();
       pages[ch.id] = pageOf(ch.id, ch.title, iconFor(ch.title), [...TAGS], PAGE.js, ch.sort, sectionBody);
@@ -185,7 +171,7 @@ export function createJsRefPages(): Record<string, Page> {
       const body = ch.body.trim() ? `# ${ch.title}\n\n${ch.body}` : `# ${ch.title}`;
       pages[ch.id] = pageOf(ch.id, ch.title, iconFor(ch.title), [...TAGS], PAGE.js, ch.sort, body);
     }
-  });
+  }
 
   return pages;
 }
@@ -195,14 +181,14 @@ export const JS_EXPAND: Record<string, boolean> = {
 };
 
 export function applyJsRef(
-  pages: Record<string, Page>,
-  order: string[],
+  pages: Record<string, Page>,n  order: string[],
   expanded: Record<string, boolean>,
+  rawMarkdown: string,
 ): { pages: Record<string, Page>; order: string[]; expanded: Record<string, boolean> } {
-  const ref = createJsRefPages();
+  const ref = createJsRefPages(rawMarkdown);
   const nextPages = { ...pages, ...ref };
-  const nextOrder = order.includes(PAGE.js) ? [...order] : [...order];
-  if (!order.includes(PAGE.js)) {
+  const nextOrder = [...order];
+  if (!nextOrder.includes(PAGE.js)) {
     const after = nextOrder.indexOf(PAGE.xss);
     if (after >= 0) nextOrder.splice(after, 0, PAGE.js);
     else {
@@ -215,4 +201,14 @@ export function applyJsRef(
     order: nextOrder,
     expanded: { ...expanded, ...JS_EXPAND },
   };
+}
+
+export async function loadJsNotesMarkdown(): Promise<string | null> {
+  try {
+    const res = await fetch("./js-notes.md");
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
 }
